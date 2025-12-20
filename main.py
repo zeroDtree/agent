@@ -3,7 +3,7 @@
 import hydra
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from omegaconf import DictConfig
-
+import omegaconf
 from graphs.graph import AutoMode, Graph, GraphConfig, LLMConfig, LoggerConfig, ToolConfig, WorkConfig
 from tools import get_run_shell_command_popen_tool
 
@@ -18,6 +18,7 @@ def main(cfg: DictConfig):
     """
     Main function to run the chatbot
     """
+    print(omegaconf.OmegaConf.to_yaml(cfg=cfg))
     # log
     log_config = LoggerConfig(log_dir=cfg.log.log_dir, log_level=cfg.log.log_level)
     log_dir = get_and_create_new_log_dir(root=log_config.log_dir, prefix="", suffix="", strftime_format="%Y%m%d")

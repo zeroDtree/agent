@@ -10,4 +10,3 @@ docker run \
 	-e DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY \
 	agent:1.0 \
 	bash -lc "source /opt/conda/etc/profile.d/conda.sh && conda activate agent && python /tmp/proj_dir/main.py $*"
-	# conda activate agent && python /proj_dir/main.py $@
