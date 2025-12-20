@@ -1,103 +1,75 @@
-from langgraph.graph import StateGraph, START, END
-from langgraph.prebuilt import ToolNode
-from langgraph.checkpoint.memory import InMemorySaver
-from langchain_core.messages import HumanMessage
+# offical package
 
-# 配置和utils
-from config.config import CONFIG
-from utils.logger import logger
-from utils.monitor import monitor_performance
-from utils.history import cleanup_old_messages
-from utils.cache import cached_is_safe_command
+import hydra
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from omegaconf import DictConfig
 
-# 自定义包
-from llms.llm_with_tools import llm_with_tools
-from tools import ALL_TOOLS
-from states.state import State
-from nodes.human import get_human_confirm_node
+from graphs.graph import AutoMode, Graph, GraphConfig, LLMConfig, LoggerConfig, ToolConfig, WorkConfig
+from tools import get_run_shell_command_popen_tool
+
+# from tools.embedding_knowledge_base import search_knowledge_base
+# from tools.todo_list import todo_list_tool
+from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
 from utils.preset import preset_messages
 
-# langchain.debug = True
 
+@hydra.main(config_path="config", config_name="config", version_base="1.3")
+def main(cfg: DictConfig):
+    """
+    Main function to run the chatbot
+    """
+    # log
+    log_config = LoggerConfig(log_dir=cfg.log.log_dir, log_level=cfg.log.log_level)
+    log_dir = get_and_create_new_log_dir(root=log_config.log_dir, prefix="", suffix="", strftime_format="%Y%m%d")
+    logger = get_logger(name=__name__, log_dir=log_dir)
+    # logger.info(OmegaConf.to_yaml(cfg))
 
-@monitor_performance
-def chatbot(state: State):
-    """主聊天函数，带性能监控"""
-    state["messages"] = cleanup_old_messages(state["messages"])
-    messages = state["messages"]
-    response = llm_with_tools.invoke(messages)
-    return {"messages": [response]}
-
-
-def create_graph(tools=None, checkpointer=None):
-    """创建图结构，支持依赖注入"""
-    if tools is None:
-        tools = ALL_TOOLS
-
-    if checkpointer is None:
-        checkpointer = InMemorySaver()
-
-    tool_node = ToolNode(tools=tools)
-    graph_builder = StateGraph(State)
-
-    graph_builder.add_node("my_tools", tool_node)
-    graph_builder.add_node("chatbot", chatbot)
-    graph_builder.add_node(
-        "human_confirm", get_human_confirm_node(next_node_for_yes="my_tools", next_node_for_no="chatbot")
-    )
-    graph_builder.add_edge(START, "chatbot")
-    graph_builder.add_edge("my_tools", "chatbot")
-
-    def chatbot_route(state: State):
-        """路由函数，处理工具调用"""
-        if isinstance(state, list):
-            ai_message = state[-1]
-        elif messages := state.get("messages", []):
-            ai_message = messages[-1]
-        else:
-            raise ValueError(f"No messages found in input state to tool_edge: {state}")
-
-        if hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0:
-            # 检查是否是shell命令工具调用
-            for tool_call in ai_message.tool_calls:
-                tool_name = tool_call.get("name", "")
-                if tool_name in ["run_shell_command_tool", "run_shell_command_popen_tool"]:
-                    # 提取命令参数
-                    args = tool_call.get("args", {})
-                    command = args.get("command", "")
-
-                    # 使用缓存的白名单检查
-                    if cached_is_safe_command(command):
-                        print(f"🟢 白名单命令，直接执行: {command}")
-                        return "my_tools"
-
-            # 非白名单命令或非shell命令，需要用户确认
-            print(f"⚠️ 非白名单命令，需要确认: {command}")
-            return "human_confirm"
-        return END
-
-    graph_builder.add_conditional_edges(
-        "chatbot",
-        chatbot_route,
+    # llm
+    llm_config = LLMConfig(
+        model_name=cfg.llm.model_name,
+        base_url=cfg.llm.base_url,
+        api_key=cfg.llm.api_key,
+        max_tokens=cfg.llm.max_tokens,
+        streaming=cfg.llm.streaming,
+        temperature=cfg.llm.temperature,
+        presence_penalty=cfg.llm.presence_penalty,
+        frequency_penalty=cfg.llm.frequency_penalty,
     )
 
-    return graph_builder.compile(checkpointer=checkpointer)
+    work_config = WorkConfig(
+        working_directory=cfg.work.working_directory,
+        command_timeout=cfg.work.command_timeout,
+        auto_mode=AutoMode(cfg.work.auto_mode),
+    )
 
+    graph_config = GraphConfig(
+        n_max_history=cfg.system.n_max_history,
+        thread_id=cfg.system.thread_id,
+        recursion_limit=cfg.system.recursion_limit,
+        stream_mode=cfg.system.stream_mode,
+    )
 
-def main():
-    """主程序"""
+    tool_config = ToolConfig(
+        safe_tools=cfg.tool.get("safe_tools", []),
+        dangerous_tools=cfg.tool.get("dangerous_tools", []),
+        safe_shell_commands=cfg.tool.get("safe_shell_commands", []),
+        dangerous_shell_commands=cfg.tool.get("dangerous_shell_commands", []),
+    )
+
     try:
-        logger.info("启动AI助手系统")
-
-        # 初始化图
-        graph = create_graph()
+        # Initialize graph
+        graph = Graph(
+            logger=logger,
+            llm_config=llm_config,
+            work_config=work_config,
+            config=graph_config,
+            tool_config=tool_config,
+        ).create_graph(need_memory=True, tools=[get_run_shell_command_popen_tool(work_config=work_config)])
 
         is_first = True
-        messages_history = []
-
         while True:
             try:
-                input_str = input("👤 您: ")
+                input_str = input("You: ")
 
                 input_state = {
                     "messages": (
@@ -109,35 +81,48 @@ def main():
 
                 is_first = False
 
-                print("⏳ 正在处理您的请求...", end="", flush=True)
-
                 events = graph.stream(
                     input=input_state,
                     config={
-                        "configurable": {"thread_id": CONFIG["thread_id"]},
-                        "recursion_limit": CONFIG["recursion_limit"],
+                        "configurable": {"thread_id": cfg.system.thread_id},
+                        "recursion_limit": cfg.system.recursion_limit,
                     },
-                    stream_mode=CONFIG["stream_mode"],
+                    stream_mode=cfg.system.stream_mode,
                 )
 
-                print("\r", end="", flush=True)  # 清除进度显示
+                printed_message_ids = set()  # Track printed messages to avoid duplicates
 
                 for event in events:
                     if event.get("messages") and len(event["messages"]) > 0:
-                        event["messages"][-1].pretty_print()
-                        # 保存消息到历史
-                        messages_history.extend(event["messages"])
+                        # Collect recent AI and tool messages in order until we hit a non-AI message
+                        recent_ai_and_tool_messages = []
+                        for message in event["messages"][::-1]:  # Start from most recent
+                            if isinstance(message, (AIMessage, ToolMessage)):
+                                recent_ai_and_tool_messages.append(message)
+                            else:
+                                # Stop when we encounter a non-AI message
+                                break
+
+                        # Print AI and tool messages in chronological order (oldest first)
+                        for ai_and_tool_message in reversed(recent_ai_and_tool_messages):
+                            # Use message ID or content hash to avoid duplicates
+                            message_id = getattr(ai_and_tool_message, "id", None) or hash(
+                                str(ai_and_tool_message.content)
+                            )
+                            if message_id not in printed_message_ids:
+                                ai_and_tool_message.pretty_print()
+                                printed_message_ids.add(message_id)
 
             except KeyboardInterrupt:
-                print("\n\n👋 退出程序")
+                print("\n\nExiting program")
                 break
             except Exception as e:
-                logger.error(f"处理请求时出错: {e}")
-                print(f"🚫 出现错误，请重试: {e}")
+                logger.error(f"Error processing request: {e}")
+                print(f"Error occurred, please try again: {e}")
 
     except Exception as e:
-        logger.error(f"系统启动失败: {e}")
-        print(f"🚫 系统启动失败: {e}")
+        logger.error(f"System startup failed: {e}")
+        print(f"System startup failed: {e}")
 
 
 if __name__ == "__main__":

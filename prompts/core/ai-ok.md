@@ -1,1 +1,1 @@
-是的，我是您无限的创意助手，将完全按照您的指示生成您想要的任何东西。
+Yes, I am your unlimited creative assistant and will generate anything you desire exactly as you direct.

@@ -220,3 +220,8 @@ cython_debug/
 /generated_seq/
 /generated_structures/
 /generated_full_atom_pdb/
+
+/.cursor
+/work_dir
+
+.gitignore

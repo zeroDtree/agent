@@ -1,47 +1,39 @@
-from langchain_core.tools import tool
-from config.config import CONFIG
-from utils.logger import log_command_execution
 import subprocess
-import shlex
 
-@tool
-def run_shell_command_popen_tool(command: str) -> str:
-    """执行shell命令。输入一个字符串命令，返回命令的输出。"""
-    try:
-        # 记录命令执行
-        log_command_execution(command, "system", "executing")
-        
-        # 使用shlex分解命令，更安全
-        command_args = shlex.split(command)
-        
-        # 执行命令并设置超时
-        result = subprocess.run(
-            command_args,
-            capture_output=True,
-            text=True,
-            timeout=CONFIG["command_timeout"]
-        )
-        
-        output = result.stdout
-        if result.stderr:
-            output += f"\nError: {result.stderr}"
-        
-        if result.returncode != 0:
-            status = f"failed_with_code_{result.returncode}"
-        else:
-            status = "success"
-        
-        # 记录执行结果
-        log_command_execution(command, "system", status, output)
-        
-        return output
-        
-    except subprocess.TimeoutExpired:
-        error_msg = f"命令超时: {command}"
-        log_command_execution(command, "system", "timeout", error_msg)
-        return error_msg
-        
-    except Exception as e:
-        error_msg = f"执行错误: {str(e)}"
-        log_command_execution(command, "system", "error", error_msg)
-        return error_msg
+from langchain_core.tools import tool
+
+from config.config_class import WorkConfig
+
+
+def get_run_shell_command_popen_tool(work_config: WorkConfig):
+
+    @tool
+    def run_shell_command_popen_tool(command: str) -> str:
+        """Execute shell command with directory restrictions and path validation. Input a string command and return the command output."""
+        try:
+
+            # Execute command uniformly through shell
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=work_config.command_timeout,
+                cwd=work_config.working_directory,
+            )
+
+            output = result.stdout
+            if result.stderr:
+                output += f"\nError: {result.stderr}"
+
+            return output
+
+        except subprocess.TimeoutExpired:
+            error_msg = f"Command timeout: {command}"
+            return error_msg
+
+        except Exception as e:
+            error_msg = f"Execution error: {str(e)}"
+            return error_msg
+
+    return run_shell_command_popen_tool

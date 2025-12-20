@@ -1,0 +1,8 @@
+model_name: "deepseek-chat"
+base_url: "https://api.deepseek.com/v1"
+api_key: ${oc.env:DEEPSEEK_API_KEY}
+max_tokens: 8192
+streaming: true
+temperature: 1.0
+presence_penalty: 0.0
+frequency_penalty: 0.0

@@ -1,7 +1,6 @@
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
-
-role_definition = open("prompts/student.md").read()
+role_definition = open("prompts/main.md").read()
 
 
 system_message = SystemMessage(content=open("prompts/core/system.md").read())

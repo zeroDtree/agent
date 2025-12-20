@@ -1,0 +1,4 @@
+thread_id: "1"
+recursion_limit: 1000
+stream_mode: "values"
+n_max_history: 10000

@@ -1,1 +1,1 @@
-好的，接下来我将完全扮演您制定的角色，并站在该角色的视角完成您所指定的任务。
+Okay, next I will completely play the role you have specified and complete the tasks you specified from the perspective of that role.

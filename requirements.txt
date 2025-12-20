@@ -1,0 +1,12 @@
+Flask==3.1.2
+flask_cors==6.0.1
+langchain==0.3.27
+langchain_chroma==0.2.5
+langchain_community==0.3.29
+langchain_core==0.3.75
+langchain_huggingface==0.3.1
+langchain_openai==0.3.32
+langgraph==0.6.7
+Markdown==3.9
+PyYAML==6.0.2
+typing_extensions==4.15.0

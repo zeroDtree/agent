@@ -1,0 +1,9 @@
+defaults:
+  - system: default
+  - log: default
+  - work: default
+  - llm: deepseek
+  - ekb: default
+  - tool: default
+  - _self_
+# Override any defaults here if needed
