@@ -14,7 +14,7 @@ try:
 except ImportError:
     from langchain_community.vectorstores import Chroma
 
-from langchain.schema import Document
+from langchain_core.documents import Document
 
 from utils.logger import get_logger
 
@@ -59,7 +59,7 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
     def __init__(
         self,
         persist_directory: str,
-        embedding_function: Any,
+        embedding_function: Any = None,
         name: str = "default",
     ):
         self.persist_directory = Path(persist_directory)
@@ -117,9 +117,19 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
         if not self.exists():
             return False
 
+        # Get embedding function, using lazy getter if available
+        embedding_func = self.embedding_function
+        if embedding_func is None and hasattr(self, "_lazy_embedding_getter"):
+            embedding_func = self._lazy_embedding_getter()
+            self.embedding_function = embedding_func
+
+        if embedding_func is None:
+            logger.warning(f"Cannot load vectorstore for '{self.name}': no embedding function provided")
+            return False
+
         try:
             self.vectorstore = Chroma(
-                persist_directory=str(self.persist_directory), embedding_function=self.embedding_function
+                persist_directory=str(self.persist_directory), embedding_function=embedding_func
             )
             logger.info(f"Loaded existing vectorstore for '{self.name}'")
             return True
@@ -138,12 +148,22 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
 
         self._cleanup_corrupted_files()
 
+        # Get embedding function, using lazy getter if available
+        embedding_func = self.embedding_function
+        if embedding_func is None and hasattr(self, "_lazy_embedding_getter"):
+            embedding_func = self._lazy_embedding_getter()
+            self.embedding_function = embedding_func
+
+        if embedding_func is None:
+            logger.error(f"Cannot create database '{self.name}': no embedding function provided")
+            return False
+
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 self.vectorstore = Chroma.from_documents(
                     documents=documents,
-                    embedding=self.embedding_function,
+                    embedding=embedding_func,
                     persist_directory=str(self.persist_directory),
                 )
                 logger.info(f"Created vector database '{self.name}' with {len(documents)} documents")
@@ -256,14 +276,41 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
             "directory_exists": self.persist_directory.exists(),
         }
 
-        if self.vectorstore is not None or self._load_existing_vectorstore():
+        # Try to get collection count without loading embedding model
+        if self.vectorstore is not None:
             try:
                 collection = self.vectorstore._collection
                 stats["collection_count"] = collection.count()
             except Exception as e:
                 stats["collection_count"] = f"Error: {e}"
+        elif self.exists():
+            # Try to get count directly from ChromaDB without embedding function
+            try:
+                import chromadb
+                client = chromadb.PersistentClient(path=str(self.persist_directory))
+                # Try to list all collections and get the first one
+                collections = client.list_collections()
+                if collections:
+                    # Use the first collection found
+                    collection = collections[0]
+                    stats["collection_count"] = collection.count()
+                else:
+                    stats["collection_count"] = 0
+            except Exception as e:
+                # Fallback: try loading with embedding function if available
+                if self.embedding_function is not None:
+                    try:
+                        if self._load_existing_vectorstore():
+                            collection = self.vectorstore._collection
+                            stats["collection_count"] = collection.count()
+                        else:
+                            stats["collection_count"] = "Not initialized"
+                    except Exception as load_error:
+                        stats["collection_count"] = f"Error: {load_error}"
+                else:
+                    stats["collection_count"] = "Not initialized (no embedding function)"
         else:
-            stats["collection_count"] = "Not initialized"
+            stats["collection_count"] = 0
 
         return stats
 
@@ -275,7 +322,7 @@ class VectorDatabaseFactory:
     def create_database(
         db_type: str,
         persist_directory: str,
-        embedding_function: Any,
+        embedding_function: Any = None,
         name: str = "default",
         **kwargs,
     ) -> VectorDatabaseInterface:

@@ -11,10 +11,20 @@ from tools import get_run_shell_command_popen_tool
 # from tools.todo_list import todo_list_tool
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
 from utils.preset import preset_messages
+import asyncio
+from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
-@hydra.main(config_path="config", config_name="config", version_base="1.3")
-def main(cfg: DictConfig):
+async def get_mcp_tools(mcp_config) -> list:
+    try:
+        client = MultiServerMCPClient(dict(mcp_config))
+        tools = await client.get_tools()
+    except Exception as e:
+        return []
+    return tools
+
+
+async def async_main(cfg: DictConfig):
     """
     Main function to run the chatbot
     """
@@ -59,13 +69,15 @@ def main(cfg: DictConfig):
 
     try:
         # Initialize graph
+        mcp_tools = await get_mcp_tools(cfg.mcp)
+        tools = [get_run_shell_command_popen_tool(work_config=work_config)] + mcp_tools
         graph = Graph(
             logger=logger,
             llm_config=llm_config,
             work_config=work_config,
             config=graph_config,
             tool_config=tool_config,
-        ).create_graph(need_memory=True, tools=[get_run_shell_command_popen_tool(work_config=work_config)])
+        ).create_graph(need_memory=True, tools=tools)
 
         is_first = True
         while True:
@@ -82,7 +94,7 @@ def main(cfg: DictConfig):
 
                 is_first = False
 
-                events = graph.stream(
+                events = graph.astream(
                     input=input_state,
                     config={
                         "configurable": {"thread_id": cfg.system.thread_id},
@@ -93,7 +105,7 @@ def main(cfg: DictConfig):
 
                 printed_message_ids = set()  # Track printed messages to avoid duplicates
 
-                for event in events:
+                async for event in events:
                     if event.get("messages") and len(event["messages"]) > 0:
                         # Collect recent AI and tool messages in order until we hit a non-AI message
                         recent_ai_and_tool_messages = []
@@ -124,6 +136,11 @@ def main(cfg: DictConfig):
     except Exception as e:
         logger.error(f"System startup failed: {e}")
         print(f"System startup failed: {e}")
+
+
+@hydra.main(config_path="config", config_name="config", version_base="1.3")
+def main(cfg):
+    asyncio.run(async_main(cfg))
 
 
 if __name__ == "__main__":

@@ -1,4 +1,5 @@
-from typing import Annotated, Optional
+from typing import Annotated, Optional, Any
+import asyncio
 
 from langchain_core.messages import BaseMessage, ToolMessage
 from langchain_core.tools import Tool
@@ -48,7 +49,8 @@ class Graph:
         if checkpointer is None:
             checkpointer = InMemorySaver() if need_memory else None
 
-        tool_node = ToolNode(tools=tools)
+        # Create a custom tool node that handles MCP tool response format
+        tool_node = self.get_custom_tool_node(tools=tools)
         graph_builder = StateGraph(State)
 
         graph_builder.add_node("my_tools", tool_node)
@@ -99,7 +101,7 @@ class Graph:
 
     def get_auto_reject_node(self, next_node: str):
         def auto_reject_node(state: State):
-            return self.reject_node(state, next_node)
+            return self.reject_node(state, next_node, "Tool execution was automatically rejected")
 
         return auto_reject_node
 
@@ -175,13 +177,12 @@ class Graph:
 
     def get_chatbot_node(self, config: LLMConfig, tools: list[Tool] = None):
 
-        def chatbot(state: State):
+        async def chatbot(state: State):
             """Main chatbot function with performance monitoring"""
             state["messages"] = self.cleanup_old_messages(state["messages"], max_history=self.config.n_max_history)
             messages = state["messages"]
             llm_with_tools = self.get_llm_with_tools(config=config, tools=tools)
-
-            response = llm_with_tools.invoke(messages)
+            response = await llm_with_tools.ainvoke(messages)
             return {"messages": [response]}
 
         return chatbot
@@ -193,3 +194,97 @@ class Graph:
             # Keep the most recent max_history messages
             return messages[-max_history:]
         return messages
+
+    def get_custom_tool_node(self, tools=None):
+        """
+        Create a custom tool node that executes tools and converts MCP tool response
+        content from list format to string format for LLM compatibility.
+        """
+        # Create a tool dictionary for easy lookup
+        tool_dict = {tool.name: tool for tool in tools} if tools else {}
+
+        async def custom_tool_node(state: State):
+            """Custom tool node that executes tools and converts content format"""
+            messages = state.get("messages", [])
+            last_message = messages[-1] if messages else None
+
+            if not last_message or not hasattr(last_message, "tool_calls") or not last_message.tool_calls:
+                return {"messages": []}
+
+            async def execute_tool(tool_call):
+                """Execute a single tool call and return ToolMessage"""
+                tool_name = tool_call.get("name", "")
+                tool_args = tool_call.get("args", {})
+                tool_call_id = tool_call.get("id", "")
+
+                if tool_name in tool_dict:
+                    tool = tool_dict[tool_name]
+                    try:
+                        # Execute the tool
+                        if hasattr(tool, "ainvoke"):
+                            tool_result = await tool.ainvoke(tool_args)
+                        elif hasattr(tool, "invoke"):
+                            tool_result = tool.invoke(tool_args)
+                        else:
+                            tool_result = tool(**tool_args) if callable(tool) else None
+
+                        # Extract text from content blocks if needed
+                        content = extract_text_from_content_blocks(tool_result)
+
+                        # Create ToolMessage with string content
+                        return ToolMessage(
+                            content=content,
+                            tool_call_id=tool_call_id,
+                            name=tool_name,
+                        )
+                    except Exception as e:
+                        error_msg = f"Error executing tool {tool_name}: {str(e)}"
+                        self.logger.error(error_msg)
+                        return ToolMessage(
+                            content=error_msg,
+                            tool_call_id=tool_call_id,
+                            name=tool_name,
+                        )
+                else:
+                    error_msg = f"Tool '{tool_name}' not found"
+                    self.logger.warning(error_msg)
+                    return ToolMessage(
+                        content=error_msg,
+                        tool_call_id=tool_call_id,
+                        name=tool_name,
+                    )
+
+            # Execute all tool calls in parallel for better performance
+            tool_messages = await asyncio.gather(*[execute_tool(tool_call) for tool_call in last_message.tool_calls])
+
+            return {"messages": tool_messages}
+
+        return custom_tool_node
+
+
+def extract_text_from_content_blocks(content: Any) -> str:
+    """
+    Extract text content from MCP tool response content blocks.
+    MCP tools may return content as a list of content blocks like:
+    [{'type': 'text', 'text': '15', 'id': '...'}]
+    This function converts such formats to a plain string.
+    """
+    if isinstance(content, str):
+        return content
+    elif isinstance(content, list):
+        # Extract text from content blocks
+        texts = []
+        for block in content:
+            if isinstance(block, dict):
+                # Handle different content block formats
+                if block.get("type") == "text" and "text" in block:
+                    texts.append(str(block["text"]))
+                elif "content" in block:
+                    texts.append(str(block["content"]))
+                elif "text" in block:
+                    texts.append(str(block["text"]))
+            elif isinstance(block, str):
+                texts.append(block)
+        return "\n".join(texts) if texts else str(content)
+    else:
+        return str(content)

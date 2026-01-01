@@ -5,5 +5,6 @@ defaults:
   - llm: deepseek
   - ekb: default
   - tool: default
+  - mcp: default
   - _self_
 # Override any defaults here if needed

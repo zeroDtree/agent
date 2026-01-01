@@ -10,8 +10,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from langchain.schema import Document
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 
 from utils.doc_processor import CodeProcessor, DocumentProcessor, JSONProcessor, MarkdownProcessor, TextProcessor
@@ -27,6 +27,7 @@ class EKBConfig:
         source_paths: Optional[List[str]] = None,
         vector_db_path: str = "data/vector_db",
         embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+        embedding_device: str = "cpu",
         chunk_size: int = 2000,
         chunk_overlap: int = 100,
         search_k: int = 10,
@@ -42,6 +43,7 @@ class EKBConfig:
         self.source_paths = source_paths
         self.vector_db_path = vector_db_path
         self.embedding_model = embedding_model
+        self.embedding_device = embedding_device
         self.chunk_size = chunk_size
         self.chunk_overlap = chunk_overlap
         self.search_k = search_k
@@ -96,13 +98,10 @@ class EmbeddingKnowledgeBase:
         if custom_processors:
             self.processors.extend(custom_processors)
 
-        # Initialize embedding model
-        embedding_model = self.config.embedding_model
-        self.embeddings = HuggingFaceEmbeddings(
-            model_name=embedding_model,
-            model_kwargs={"device": "cpu"},
-            encode_kwargs={"normalize_embeddings": True},
-        )
+        # Embedding model will be initialized lazily
+        self._embeddings = None
+        self._embedding_model = self.config.embedding_model
+        self._embedding_device = self.config.embedding_device
 
         chunk_size = self.config.chunk_size
         chunk_overlap = self.config.chunk_overlap
@@ -118,13 +117,16 @@ class EmbeddingKnowledgeBase:
         self.debug_mode = self.config.debug_mode
 
         # Initialize vector database using abstraction layer
+        # Embedding function will be set lazily when needed
         self.vector_db = VectorDatabaseFactory.create_database(
             db_type=self.config.db_type,
             persist_directory=str(self.vector_db_path),
-            embedding_function=self.embeddings,
+            embedding_function=None,  # Will be set lazily
             name=self.config.name,
             debug_mode=self.config.debug_mode,
         )
+        # Set embedding function reference for lazy initialization
+        self.vector_db._lazy_embedding_getter = lambda: self.embeddings
 
         # Configuration and metadata file path
         self.config_file = self.vector_db_path / "config.json"
@@ -133,6 +135,18 @@ class EmbeddingKnowledgeBase:
         self._load_metadata()
 
         self._save_config()
+
+    @property
+    def embeddings(self):
+        """Lazy initialization of embedding model"""
+        if self._embeddings is None:
+            print(f"Initializing embedding model '{self._embedding_model}' on device '{self._embedding_device}'")
+            self._embeddings = HuggingFaceEmbeddings(
+                model_name=self._embedding_model,
+                model_kwargs={"device": self._embedding_device},
+                encode_kwargs={"normalize_embeddings": True},
+            )
+        return self._embeddings
 
     def _load_metadata(self):
         """Load metadata"""
@@ -741,10 +755,12 @@ class EmbeddingKnowledgeBase:
             new_vector_db = VectorDatabaseFactory.create_database(
                 db_type=new_db_type,
                 persist_directory=str(self.vector_db_path),
-                embedding_function=self.embeddings,
+                embedding_function=None,  # Will be set lazily
                 name=self.config.name,
                 debug_mode=self.debug_mode,
             )
+            # Set embedding function reference for lazy initialization
+            new_vector_db._lazy_embedding_getter = lambda: self.embeddings
 
             # If successful, update references
             self.db_type = new_db_type

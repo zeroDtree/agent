@@ -25,7 +25,7 @@ RUN conda init --all && conda config --set auto_activate false && conda tos acce
 RUN conda create -y -n agent python=3.12
 COPY requirements.txt /tmp/requirements.txt
 COPY requirements_kb.txt /tmp/requirements_kb.txt
-RUN conda run -n agent pip install -r /tmp/requirements.txt 
-RUN conda run -n agent pip install -r /tmp/requirements_kb.txt
+RUN conda run -n agent pip install -U -r /tmp/requirements.txt 
+RUN conda run -n agent pip install -U -r /tmp/requirements_kb.txt
 RUN mkdir -p /tmp/proj_dir && mkdir -p /tmp/work_dir
 WORKDIR /tmp/proj_dir
