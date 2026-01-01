@@ -1,40 +1,50 @@
+- [1. Core Features](#1-core-features)
+- [2. Quick Start](#2-quick-start)
+  - [2.1. Run agent in host](#21-run-agent-in-host)
+  - [2.2. Run agent in docker container](#22-run-agent-in-docker-container)
+- [3. Auto Mode](#3-auto-mode)
+  - [3.1. Examples](#31-examples)
+- [4. Tools:](#4-tools)
+- [5. Embedding Knowledge Base (EKB)](#5-embedding-knowledge-base-ekb)
+  - [5.1. Features](#51-features)
+  - [5.2. Usage](#52-usage)
+  - [5.3. Examples](#53-examples)
+    - [5.3.1. Create Knowledge Base](#531-create-knowledge-base)
+    - [5.3.2. Search and Manage](#532-search-and-manage)
 
-- [1. Quick Start](#1-quick-start)
-  - [1.1. Run agent in host](#11-run-agent-in-host)
-  - [1.2. Run agent in docker container](#12-run-agent-in-docker-container)
-- [2. Auto Mode](#2-auto-mode)
-  - [2.1. Examples](#21-examples)
-- [3. Tools:](#3-tools)
-- [4. Embedding Knowledge Base (EKB)](#4-embedding-knowledge-base-ekb)
-  - [4.1. Features](#41-features)
-  - [4.2. Usage](#42-usage)
-  - [4.3. Examples](#43-examples)
-    - [4.3.1. Create Knowledge Base](#431-create-knowledge-base)
-    - [4.3.2. Search and Manage](#432-search-and-manage)
+## 1. Core Features
 
-## 1. Quick Start
+- **🤖 Intelligent AI Agent**: Built on LangGraph framework with state management and memory support
+- **🔒 5-Level Security System**: Flexible auto-mode with manual, blacklist, whitelist, universal reject/accept modes
+- **📚 Embedding Knowledge Base (EKB)**: Vector database system for document retrieval with smart filtering
+- **🔧 MCP Tool Integration**: Support for Model Context Protocol (MCP) tools for extended functionality
+- **💻 Shell Command Execution**: Safe shell command execution with timeout and working directory control
+- **⚙️ Flexible Configuration**: Hydra-based configuration management with hierarchical config files
+- **🐳 Docker Support**: Secure containerized deployment with isolated environment for safe command execution
 
-### 1.1. Run agent in host
+## 2. Quick Start
+
+### 2.1. Run agent in host
 
 ```bash
 conda create -n agent python=3.12
 conda activate agent
-pip install -r requirements.txt
-pip install -r requirements_kb.txt
+pip install -U -r requirements.txt
+pip install -U -r requirements_kb.txt
 ```
 
 ```bash
 python main.py
 ```
 
-### 1.2. Run agent in docker container
+### 2.2. Run agent in docker container
 
 ```bash
 bash shell_scripts/build_docker.sh
 bash shell_scripts/start.docker.sh
 ```
 
-## 2. Auto Mode
+## 3. Auto Mode
 
 Intelligent command processing with 5 security levels - from manual approval to full automation.
 
@@ -46,7 +56,7 @@ Intelligent command processing with 5 security levels - from manual approval to 
 | ✅ **Whitelist Accept** | `whitelist_accept` | Auto-approve safe, reject dangerous   | Balanced automation       |
 | 🟢 **Universal Accept** | `universal_accept` | Auto-approve everything ⚠️            | Trusted environments only |
 
-### 2.1. Examples
+### 3.1. Examples
 
 ```bash
 bash shell_scripts/start.docker.sh \
@@ -54,24 +64,24 @@ bash shell_scripts/start.docker.sh \
   ++work.working_directory=/tmp/work_dir
 ```
 
-## 3. Tools:
+## 4. Tools:
 
 | Tool Name                 | Description               |
 | ------------------------- | ------------------------- |
 | `search_knowledge_base`   | Search the knowledge base |
 | `run_shell_command_popen` | Run a shell command       |
 
-## 4. Embedding Knowledge Base (EKB)
+## 5. Embedding Knowledge Base (EKB)
 
 Convert various document types to vector database for AI retrieval.
 
-### 4.1. Features
+### 5.1. Features
 
 - **Smart Filtering**: Automatic .gitignore support and flexible regex patterns
 - **Configurable Processing**: Control include/exclude pattern order
 - **Multiple Formats**: Support for various document types
 
-### 4.2. Usage
+### 5.2. Usage
 
 Manage knowledge bases with `python manage_kb.py`:
 
@@ -85,9 +95,9 @@ Manage knowledge bases with `python manage_kb.py`:
 
 Use `python manage_kb.py <command> --help` for detailed options.
 
-### 4.3. Examples
+### 5.3. Examples
 
-#### 4.3.1. Create Knowledge Base
+#### 5.3.1. Create Knowledge Base
 
 ```bash
 # From current directory
@@ -100,7 +110,7 @@ python manage_kb.py update -n blog -s data/blog_content
 python manage_kb.py update -n blog
 ```
 
-#### 4.3.2. Search and Manage
+#### 5.3.2. Search and Manage
 
 ```bash
 # Search knowledge base
