@@ -14,3 +14,4 @@ Markdown==3.9
 PyYAML==6.0.2
 typing_extensions==4.15.0
 hydra-core
+omegaconf
