@@ -1,0 +1,10 @@
+name: New MCP server
+version: 0.0.1
+schema: v1
+mcpServers:
+  - name: CodeLint
+    type: streamable-http
+    url: http://0.0.0.0:8001/mcp
+  - name: Math
+    type: streamable-http
+    url: http://0.0.0.0:8000/mcp
