@@ -128,9 +128,7 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
             return False
 
         try:
-            self.vectorstore = Chroma(
-                persist_directory=str(self.persist_directory), embedding_function=embedding_func
-            )
+            self.vectorstore = Chroma(persist_directory=str(self.persist_directory), embedding_function=embedding_func)
             logger.info(f"Loaded existing vectorstore for '{self.name}'")
             return True
         except Exception as e:
@@ -287,6 +285,7 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
             # Try to get count directly from ChromaDB without embedding function
             try:
                 import chromadb
+
                 client = chromadb.PersistentClient(path=str(self.persist_directory))
                 # Try to list all collections and get the first one
                 collections = client.list_collections()
@@ -296,7 +295,7 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
                     stats["collection_count"] = collection.count()
                 else:
                     stats["collection_count"] = 0
-            except Exception as e:
+            except Exception:
                 # Fallback: try loading with embedding function if available
                 if self.embedding_function is not None:
                     try:

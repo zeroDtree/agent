@@ -1,9 +1,13 @@
 # offical package
 
+import asyncio
+
 import hydra
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
-from omegaconf import DictConfig
 import omegaconf
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_mcp_adapters.client import MultiServerMCPClient
+from omegaconf import DictConfig
+
 from graphs.graph import AutoMode, Graph, GraphConfig, LLMConfig, LoggerConfig, ToolConfig, WorkConfig
 from tools import get_run_shell_command_popen_tool
 
@@ -11,15 +15,13 @@ from tools import get_run_shell_command_popen_tool
 # from tools.todo_list import todo_list_tool
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
 from utils.preset import preset_messages
-import asyncio
-from langchain_mcp_adapters.client import MultiServerMCPClient
 
 
 async def get_mcp_tools(mcp_config) -> list:
     try:
         client = MultiServerMCPClient(dict(mcp_config))
         tools = await client.get_tools()
-    except Exception as e:
+    except Exception:
         return []
     return tools
 

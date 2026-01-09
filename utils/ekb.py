@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from langchain_core.documents import Document
-from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from utils.doc_processor import CodeProcessor, DocumentProcessor, JSONProcessor, MarkdownProcessor, TextProcessor
 from utils.gitignore import GitIgnoreChecker

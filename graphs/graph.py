@@ -1,5 +1,5 @@
-from typing import Annotated, Optional, Any
 import asyncio
+from typing import Annotated, Any, Optional
 
 from langchain_core.messages import BaseMessage, ToolMessage
 from langchain_core.tools import Tool
@@ -7,7 +7,6 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
-from langgraph.prebuilt import ToolNode
 from langgraph.types import Command
 from typing_extensions import TypedDict
 
