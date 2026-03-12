@@ -1,0 +1,9 @@
+default_source_path: "."
+vector_db_path: "data/vector_db"
+embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+chunk_size: 2000
+chunk_overlap: 100
+search_k: 10
+rerank_top_k: 5
+db_type: "chroma"
+debug_mode: false

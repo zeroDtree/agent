@@ -1,0 +1,1 @@
+Your task is to play the role I specify according to my instructions and generate content from the perspective of that character. The character is defined by the <character-information></character-information> tags.

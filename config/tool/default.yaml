@@ -1,0 +1,120 @@
+safe_tools:
+  - search_knowledge_base
+  - add_text_to_knowledge_base
+  - get_knowledge_base_stats
+  - list_knowledge_bases
+
+safe_shell_commands:
+  # File system operations
+  - "ls" # list directory contents
+  - "pwd" # print working directory
+  - "cd" # change directory
+  - "mkdir" # create directory
+  - "touch" # create file
+  # File viewing and searching
+  - "cat" # display file contents
+  - "head" # display first few lines of file
+  - "tail" # display last few lines of file
+  - "grep" # search text in file
+  - "find" # search for files in directory
+  - "awk" # pattern scanning and processing language
+  - "sed" # stream editor for filtering and transforming text
+  # System information
+  - "whoami" # print current user
+  - "hostname" # print hostname
+  - "uname" # print system information
+  - "uptime" # print system uptime
+  - "ps" # print process status
+  - "top" # display system process status
+  # Network related
+  - "ping" # ping network host
+  - "curl" # transfer data from or to a server
+  - "wget" # download files from internet
+  - "netstat" # display network status
+  # Debug and development tools (safe read-only operations)
+  - "md5sum"
+  - "sha256sum"
+  - "sha1sum"
+  # Other safe commands
+  - "echo"
+  - "date"
+  - "wc"
+  - "which"
+  - "whereis"
+  - "type"
+  - "alias"
+  - "history"
+  - "clear"
+  # Environment variables
+  - "env"
+  - "export"
+  - "set"
+  # Compression and decompression (read-only)
+  - "tar"
+  - "gzip"
+  - "gunzip"
+  - "zip"
+  - "unzip"
+
+dangerous_shell_commands:
+  - "rm"
+  - "rmdir"
+  - "format"
+  - "dd"
+  - "mkfs"
+  - "fdisk"
+  - "parted"
+  - "shutdown"
+  - "reboot"
+  - "halt"
+  - "poweroff"
+  - "useradd"
+  - "userdel"
+  - "usermod"
+  - "groupadd"
+  - "groupdel"
+  - "chmod"
+  - "chown"
+  - "chgrp"
+  - "sudo"
+  - "su"
+  - "kill"
+  - "killall"
+  - "pkill"
+  - "xkill"
+  - "mount"
+  - "umount"
+  - "fstab"
+  - "iptables"
+  - "firewall-cmd"
+  - "ufw"
+  - "crontab"
+  - "at"
+  - "systemctl"
+  - "service"
+  - "passwd"
+  - "ssh-keygen"
+  - "openssl"
+  - "mysql"
+  - "psql"
+  - "sqlite3"
+  - "git"
+  - "svn"
+  - "scp"
+  - "rsync"
+  - "sftp" # File transfer
+  - "ssh"
+  - "telnet"
+  - "nc"
+  - "netcat" # Network connections
+  - "bash"
+  - "sh"
+  - "zsh"
+  - "fish" # Shell execution
+  - "vim"
+  - "nano"
+  - "emacs" # Editors
+  - "nmap"
+  - "traceroute"
+  - "dig"
+  - "nslookup" # Network probing

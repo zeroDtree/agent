@@ -1,0 +1,1 @@
+Okay, next I will completely play the role you have specified and complete the tasks you specified from the perspective of that role.

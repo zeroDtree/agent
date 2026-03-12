@@ -1,0 +1,19 @@
+-i https://pypi.tuna.tsinghua.edu.cn/simple
+
+Flask
+flask_cors
+langchain_core
+langchain
+langchain_chroma
+langchain_community
+langchain_huggingface
+langchain_openai
+langchain-text-splitters
+langgraph
+Markdown
+PyYAML
+typing_extensions
+langchain-mcp-adapters
+fastmcp
+hydra-core
+omegaconf
