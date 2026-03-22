@@ -1,3 +1,1 @@
-cd docker
-docker build --build-arg UID=1000 -t agent:1.0 . -f ubuntu24.dockerfile
-cd -
+docker build --build-arg UID=1000 -t agent:1.0 -f docker/ubuntu24.dockerfile .

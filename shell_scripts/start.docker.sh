@@ -1,12 +1,16 @@
+mkdir -p ./work_dir
+
 docker run \
 	--rm \
 	-it \
 	-v .:/tmp/proj_dir \
 	-v ./work_dir:/tmp/work_dir \
 	-v ~/.cache:/home/ubuntu/.cache \
-	--gpus all \
-	--user 1000:1000 --name agent \
+	--user 1000:1000 \
+	--name agent \
 	-e HOME=/home/ubuntu \
-	-e DEEPSEEK_API_KEY=$DEEPSEEK_API_KEY \
+	-e UV_PROJECT=/tmp/agent \
+	-e OPENAI_API_KEY="$OPENAI_API_KEY" \
+	-e OPENAI_API_BASE="$OPENAI_API_BASE" \
 	agent:1.0 \
-	bash -lc "source /opt/conda/etc/profile.d/conda.sh && conda activate agent && python /tmp/proj_dir/main.py $*"
+	bash /tmp/proj_dir/shell_scripts/start.sh "$@"

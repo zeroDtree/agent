@@ -3,7 +3,7 @@ Global constants for the project
 Contains file patterns, configurations, and other shared constants
 """
 
-from typing import Dict, List, Set
+from typing import Dict, FrozenSet, List
 
 # =============================================================================
 # Core Language Support Matrix
@@ -90,178 +90,52 @@ SPECIAL_FILENAMES: Dict[str, str] = {
 # File Extension Sets (for fast lookups)
 # =============================================================================
 
-# Generate consolidated extension sets
-_ALL_CODE_EXTENSIONS = set()
-for extensions in LANGUAGE_EXTENSIONS.values():
-    _ALL_CODE_EXTENSIONS.update(extensions)
+# Build the extension→language reverse map in a single pass
+_EXTENSION_TO_LANGUAGE: Dict[str, str] = {}
+for _lang, _exts in LANGUAGE_EXTENSIONS.items():
+    for _ext in _exts:
+        _EXTENSION_TO_LANGUAGE[_ext] = _lang
 
-# Add special extensions
-_ALL_CODE_EXTENSIONS.update(
-    {
-        # Additional file types
-        ".asm",
-        ".s",
-        ".S",  # Assembly
-        ".proto",  # Protocol Buffers
-        ".thrift",  # Thrift
-        ".graphql",
-        ".gql",  # GraphQL
-        ".tf",
-        ".tfvars",  # Terraform
-        ".dockerfile",  # Docker
-        ".mk",  # Make
-        ".cmake",  # CMake
-        ".gradle",  # Gradle
-        ".sbt",  # SBT
-        ".vim",  # Vim
-        ".el",  # Emacs Lisp
-        ".cfg",
-        ".conf",
-        ".config",
-        ".ini",  # Configuration
-        ".mod",
-        ".sum",  # Go modules
-        ".gemspec",  # Ruby gems
-        ".vb",  # VB.NET
-    }
-)
-
-CODE_EXTENSIONS: Set[str] = frozenset(_ALL_CODE_EXTENSIONS)
-
-# =============================================================================
-# Extended Language Mapping (for edge cases)
-# =============================================================================
-
-ADDITIONAL_LANGUAGE_EXTENSIONS: Dict[str, str] = {
-    # Python variants
-    ".pyi": "python",
-    ".pyx": "python",
-    # JavaScript variants
-    ".mjs": "javascript",
-    ".cjs": "javascript",
-    # C++ variants
-    ".cxx": "cpp",
-    ".cc": "cpp",
-    ".hpp": "cpp",
-    ".hxx": "cpp",
-    # Other variants
-    ".kts": "kotlin",
-    ".vb": "vbnet",
-    ".mod": "go",
-    ".sum": "go",
-    ".gemspec": "ruby",
-    ".phtml": "php",
-    ".mm": "objc",
-    ".sc": "scala",
-    ".cljs": "clojure",
-    ".cljc": "clojure",
-    ".edn": "clojure",
-    ".lhs": "haskell",
-    ".mli": "ocaml",
-    ".ocaml": "ocaml",
-    ".fsx": "fsharp",
-    ".fsi": "fsharp",
-    ".pm": "perl",
-    ".perl": "perl",
-    ".htm": "html",
-    ".xhtml": "html",
-    ".xsl": "xml",
-    ".xslt": "xml",
+# Extra extensions not covered by LANGUAGE_EXTENSIONS
+_EXTRA_EXTENSIONS: Dict[str, str] = {
+    ".asm": "assembly",
+    ".s": "assembly",
+    ".S": "assembly",
+    ".proto": "protobuf",
+    ".thrift": "thrift",
+    ".graphql": "graphql",
+    ".gql": "graphql",
+    ".tf": "terraform",
+    ".tfvars": "terraform",
     ".dockerfile": "dockerfile",
     ".mk": "make",
     ".cmake": "cmake",
     ".gradle": "gradle",
     ".sbt": "sbt",
-    ".vimrc": "vim",
-    ".emacs": "elisp",
-    ".s": "assembly",
-    ".S": "assembly",
-    ".proto": "protobuf",
-    ".thrift": "thrift",
-    ".gql": "graphql",
-    ".tfvars": "terraform",
+    ".vim": "vim",
+    ".el": "elisp",
+    ".cfg": "config",
     ".conf": "config",
     ".config": "config",
     ".ini": "config",
+    ".mod": "go",
+    ".sum": "go",
+    ".gemspec": "ruby",
+    ".vb": "vbnet",
+    ".mm": "objc",
+    ".vimrc": "vim",
+    ".emacs": "elisp",
 }
 
+_EXTENSION_TO_LANGUAGE.update(_EXTRA_EXTENSIONS)
+
+# Immutable set of all known code extensions
+CODE_EXTENSIONS: FrozenSet[str] = frozenset(_EXTENSION_TO_LANGUAGE)
 
 # Document file extensions
-DOCUMENT_EXTENSIONS: Set[str] = frozenset({".md", ".markdown", ".txt", ".text", ".json", ".rst", ".asciidoc", ".adoc"})
-
-# =============================================================================
-# File Pattern Lists (for glob operations)
-# =============================================================================
-
-
-def _generate_code_patterns() -> List[str]:
-    """Generate comprehensive code file patterns for glob operations"""
-    patterns = []
-
-    # Add patterns from language extensions
-    for extensions in LANGUAGE_EXTENSIONS.values():
-        patterns.extend(f"*{ext}" for ext in extensions)
-
-    # Add additional patterns
-    additional_patterns = [
-        # Assembly
-        "*.asm",
-        "*.s",
-        "*.S",
-        # Protocol Buffers & APIs
-        "*.proto",
-        "*.thrift",
-        "*.graphql",
-        "*.gql",
-        # Infrastructure
-        "*.tf",
-        "*.tfvars",
-        "*.dockerfile",
-        # Build systems
-        "*.mk",
-        "*.cmake",
-        "*.gradle",
-        "*.sbt",
-        # Configuration
-        "*.cfg",
-        "*.conf",
-        "*.config",
-        "*.ini",
-        # Special files (without extensions)
-        "Dockerfile",
-        "Makefile",
-        "CMakeLists.txt",
-        "build.gradle",
-    ]
-
-    patterns.extend(additional_patterns)
-    return sorted(set(patterns))
-
-
-def _generate_document_patterns() -> List[str]:
-    """Generate document file patterns for glob operations"""
-    return sorted([f"*{ext}" for ext in DOCUMENT_EXTENSIONS])
-
-
-# Generate pattern lists
-CODE_FILE_PATTERNS: List[str] = _generate_code_patterns()
-DOCUMENT_FILE_PATTERNS: List[str] = _generate_document_patterns()
-
-# =============================================================================
-# Language Categories (for semantic grouping)
-# =============================================================================
-
-LANGUAGE_CATEGORIES: Dict[str, List[str]] = {
-    "web_frontend": ["html", "css", "scss", "sass", "less", "javascript", "typescript"],
-    "web_backend": ["python", "java", "csharp", "go", "rust", "php", "ruby"],
-    "mobile": ["swift", "kotlin", "dart", "javascript"],
-    "systems": ["c", "cpp", "rust", "go", "assembly"],
-    "functional": ["haskell", "scala", "clojure", "ocaml", "fsharp", "elm"],
-    "scripting": ["python", "ruby", "lua", "perl", "shell", "powershell"],
-    "data_science": ["r", "julia", "python", "sql"],
-    "markup": ["html", "xml", "yaml", "json", "toml", "markdown"],
-    "config": ["yaml", "json", "toml", "config"],
-}
+DOCUMENT_EXTENSIONS: FrozenSet[str] = frozenset(
+    {".md", ".markdown", ".txt", ".text", ".json", ".rst", ".asciidoc", ".adoc"}
+)
 
 # =============================================================================
 # Comment Patterns (for metadata extraction)
@@ -274,6 +148,13 @@ COMMENT_PATTERNS: Dict[str, Dict[str, str]] = {
         "perl": "#",
         "r": "#",
         "shell": "#",
+        "powershell": "#",
+        "cmake": "#",
+        "make": "#",
+        "toml": "#",
+        "yaml": "#",
+        "dockerfile": "#",
+        "coffeescript": "#",
         "javascript": "//",
         "typescript": "//",
         "java": "//",
@@ -283,9 +164,16 @@ COMMENT_PATTERNS: Dict[str, Dict[str, str]] = {
         "go": "//",
         "rust": "//",
         "scala": "//",
+        "kotlin": "//",
+        "swift": "//",
+        "dart": "//",
+        "php": "//",
+        "objc": "//",
         "sql": "--",
         "lua": "--",
         "haskell": "--",
+        "elm": "--",
+        "fsharp": "//",
     },
     "block_start": {
         "javascript": "/*",
@@ -297,6 +185,11 @@ COMMENT_PATTERNS: Dict[str, Dict[str, str]] = {
         "go": "/*",
         "rust": "/*",
         "scala": "/*",
+        "kotlin": "/*",
+        "swift": "/*",
+        "dart": "/*",
+        "php": "/*",
+        "objc": "/*",
         "css": "/*",
         "scss": "/*",
         "less": "/*",
@@ -311,6 +204,11 @@ COMMENT_PATTERNS: Dict[str, Dict[str, str]] = {
         "go": "*/",
         "rust": "*/",
         "scala": "*/",
+        "kotlin": "*/",
+        "swift": "*/",
+        "dart": "*/",
+        "php": "*/",
+        "objc": "*/",
         "css": "*/",
         "scss": "*/",
         "less": "*/",
@@ -323,50 +221,27 @@ COMMENT_PATTERNS: Dict[str, Dict[str, str]] = {
 
 
 def get_language_from_extension(extension: str) -> str:
-    """Get language name from file extension"""
-    extension = extension.lower()
-
-    # Check primary language extensions
-    for lang, extensions in LANGUAGE_EXTENSIONS.items():
-        if extension in extensions:
-            return lang
-
-    # Check additional mappings
-    return ADDITIONAL_LANGUAGE_EXTENSIONS.get(extension, extension.lstrip(".") or "unknown")
+    """Get language name from file extension."""
+    return _EXTENSION_TO_LANGUAGE.get(extension.lower(), extension.lstrip(".") or "unknown")
 
 
 def get_language_from_filename(filename: str) -> str:
-    """Get language name from special filename"""
+    """Get language name from special filename."""
     return SPECIAL_FILENAMES.get(filename.lower(), "unknown")
 
 
 def is_code_file(file_path: str) -> bool:
-    """Check if file is a code file based on extension"""
+    """Check if file is a code file based on extension or special filename."""
     from pathlib import Path
 
     path = Path(file_path)
-    extension = path.suffix.lower()
-
-    if extension in CODE_EXTENSIONS:
+    if path.suffix.lower() in CODE_EXTENSIONS:
         return True
-
-    # Check special filenames
-    filename = path.name.lower()
-    return filename in SPECIAL_FILENAMES
+    return path.name.lower() in SPECIAL_FILENAMES
 
 
 def is_document_file(file_path: str) -> bool:
-    """Check if file is a document file based on extension"""
+    """Check if file is a document file based on extension."""
     from pathlib import Path
 
-    extension = Path(file_path).suffix.lower()
-    return extension in DOCUMENT_EXTENSIONS
-
-
-def get_language_category(language: str) -> List[str]:
-    """Get categories that a language belongs to"""
-    categories = []
-    for category, languages in LANGUAGE_CATEGORIES.items():
-        if language in languages:
-            categories.append(category)
-    return categories
+    return Path(file_path).suffix.lower() in DOCUMENT_EXTENSIONS

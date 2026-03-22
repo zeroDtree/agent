@@ -1,19 +1,31 @@
 #!/bin/bash
 
-cd ~/proj/my_agent
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
-# Initialize conda if not already done
-if ! command -v conda &> /dev/null; then
-    echo "Error: conda not found in PATH"
+cd "$PROJECT_DIR"
+
+if ! command -v uv &> /dev/null; then
+    echo "Error: uv not found in PATH"
     exit 1
 fi
 
-# Source conda initialization
-eval "$(conda shell.bash hook)"
+# Stop MCP servers on exit (Ctrl-C, normal exit, or error)
+cleanup() {
+    echo ""
+    bash "$SCRIPT_DIR/start_mcp.sh" stop
+}
+trap cleanup EXIT
 
-# Activate conda environment
-conda activate exp
+# Start MCP servers first and wait until their ports are ready
+if ! bash "$SCRIPT_DIR/start_mcp.sh" --wait; then
+    echo "ERROR: MCP servers failed to start, aborting."
+    exit 1
+fi
 
-echo $@
-
-python main.py $@
+echo "Args: $*"
+if [ -n "${UV_PROJECT:-}" ]; then
+    uv run --project "$UV_PROJECT" python "$PROJECT_DIR/main.py" "$@"
+else
+    uv run main.py "$@"
+fi

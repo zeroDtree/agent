@@ -9,161 +9,150 @@ class EntryStatus(Enum):
     UNSTARTED = "unstarted"
 
 
+_STATUS_ICON: dict[EntryStatus, str] = {
+    EntryStatus.COMPLETED: "✓",
+    EntryStatus.CANCELLED: "✗",
+    EntryStatus.UNSTARTED: "○",
+}
+
+
 class Entry:
-    def __init__(self, description, status):
+    def __init__(self, description: str, status: EntryStatus = EntryStatus.UNSTARTED):
         self.description = description
         self.status = status
 
-    def __repr__(self):
-        return f"{self.description} - {self.status}"
+    def __repr__(self) -> str:
+        return f"{self.description} - {self.status.value}"
 
 
 class TodoList:
-    def __init__(self, todo_list: list[str]):
-        self.entries = [Entry(description=description, status=EntryStatus.UNSTARTED) for description in todo_list]
+    def __init__(self, descriptions: list[str] | None = None):
+        self.entries: list[Entry] = [Entry(d) for d in (descriptions or [])]
+        self.cur_idx: int = 0
+
+    # ------------------------------------------------------------------
+    # Queries
+    # ------------------------------------------------------------------
+
+    @property
+    def current_entry(self) -> Entry | None:
+        if self.cur_idx < len(self.entries):
+            return self.entries[self.cur_idx]
+        return None
+
+    def format(self) -> str:
+        if not self.entries:
+            return "Todo list is empty. Use 'add' to create tasks."
+
+        lines = ["Current Todo List:", "=" * 50]
+        for idx, entry in enumerate(self.entries):
+            pointer = "→" if idx == self.cur_idx else " "
+            icon = _STATUS_ICON.get(entry.status, "?")
+            lines.append(f"{pointer} {idx + 1:2d}. {icon} {entry.description} [{entry.status.value}]")
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Mutations
+    # ------------------------------------------------------------------
+
+    def add(self, description: str) -> None:
+        self.entries.append(Entry(description))
+
+    def _advance(self, status: EntryStatus) -> str:
+        """Mark the current entry with *status* and advance the pointer. Returns the entry description."""
+        entry = self.current_entry
+        if entry is None:
+            raise IndexError("No current task — all tasks are finished.")
+        entry.status = status
+        self.cur_idx += 1
+        return entry.description
+
+    def complete(self) -> str:
+        return self._advance(EntryStatus.COMPLETED)
+
+    def cancel(self) -> str:
+        return self._advance(EntryStatus.CANCELLED)
+
+    def reset_current(self) -> str:
+        """Reset the current entry's status to UNSTARTED (does not advance the pointer)."""
+        entry = self.current_entry
+        if entry is None:
+            raise IndexError("No current task — all tasks are finished.")
+        entry.status = EntryStatus.UNSTARTED
+        return entry.description
+
+    def clear(self) -> None:
+        self.entries.clear()
         self.cur_idx = 0
 
-    def add_entry(self, entry):
-        self.entries.append(entry)
 
-    def get_entries(self):
-        return self.entries
+def get_todo_list_tool():
+    todo = TodoList()
 
-    def mark_current_entry_as_completed(self):
-        self.entries[self.cur_idx].status = EntryStatus.COMPLETED
-        self.cur_idx += 1
+    @tool
+    def todo_list_tool(action: str = "show", description: str = "") -> str:
+        """Manage a sequential todo list for planning and executing tasks.
 
-    def mark_current_entry_as_cancelled(self):
-        self.entries[self.cur_idx].status = EntryStatus.CANCELLED
-        self.cur_idx += 1
+        Args:
+            action: One of:
+                - "show"     : Display all tasks and their statuses.
+                - "add"      : Append a new task (requires description).
+                - "complete" : Mark the current task as completed and advance.
+                - "cancel"   : Mark the current task as cancelled and advance.
+                - "reset"    : Reset the current task's status to unstarted.
+                - "next"     : Show the next pending task without changing state.
+                - "clear"    : Remove all tasks and reset the list.
+            description: Task text — required only for the "add" action.
 
-    def mark_current_entry_as_unstarted(self):
-        self.entries[self.cur_idx].status = EntryStatus.UNSTARTED
-        self.cur_idx += 1
+        Returns:
+            A human-readable string describing the result and the updated list.
+        """
+        valid_actions = {"show", "add", "complete", "cancel", "reset", "next", "clear"}
+        if action not in valid_actions:
+            return f"Error: invalid action '{action}'. Valid actions: {', '.join(sorted(valid_actions))}"
 
+        try:
+            if action == "add":
+                text = description.strip() if description else ""
+                if not text:
+                    return "Error: 'description' is required when using the 'add' action."
+                todo.add(text)
+                return f"Added task: {text}\n\n{todo.format()}"
 
-todo_list = TodoList(todo_list=[])
+            if action == "complete":
+                task = todo.complete()
+                return f"Completed: {task}\n\n{todo.format()}"
 
+            if action == "cancel":
+                task = todo.cancel()
+                return f"Cancelled: {task}\n\n{todo.format()}"
 
-@tool
-def todo_list_tool(action: str = "show", description: str = None) -> str:
-    """
-    A simplified TodoList tool for agents to create plans and execute tasks sequentially.
+            if action == "reset":
+                task = todo.reset_current()
+                return f"Reset to unstarted: {task}\n\n{todo.format()}"
 
-    Args:
-        action: Available actions:
-            - "show": Display all current task statuses
-            - "add": Add a new task (requires description)
-            - "complete": Mark current task as completed and move to next
-            - "cancel": Mark current task as cancelled and move to next
-            - "reset": Reset current task to unstarted
-            - "next": Get next unprocessed task content (no state change)
-            - "clear": Clear all tasks and reset the list
+            if action == "next":
+                entry = todo.current_entry
+                return f"Next task: {entry.description}" if entry else "All tasks are finished."
 
-        description: Task description text when adding a task
+            if action == "clear":
+                todo.clear()
+                return "Cleared all tasks."
 
-    Returns:
-        Friendly text representation of the current TodoList state
-    """
+            return todo.format()  # "show"
 
-    # Validate action parameter
-    valid_actions = {"show", "add", "complete", "cancel", "reset", "next", "clear"}
-    if action not in valid_actions:
-        return f"Error: Invalid action '{action}'. Valid actions are: {', '.join(sorted(valid_actions))}"
+        except IndexError as exc:
+            return f"Error: {exc}"
+        except Exception as exc:
+            return f"Error: {exc}"
 
-    try:
-        if action == "add":
-            if not description.strip():
-                return "Error: Description is required when adding a task."
-
-            # Create new Entry object instead of passing string directly
-            new_entry = Entry(description.strip(), EntryStatus.UNSTARTED)
-            todo_list.add_entry(new_entry)
-            return f"✓ Added new task: {description.strip()}\n\n" + format_todo()
-
-        elif action == "complete":
-            if not _has_current_task():
-                return "Error: No current task to complete. All tasks are finished."
-
-            current_task = todo_list.entries[todo_list.cur_idx].description
-            todo_list.mark_current_entry_as_completed()
-            return f"✓ Completed task: {current_task}\n\n" + format_todo()
-
-        elif action == "cancel":
-            if not _has_current_task():
-                return "Error: No current task to cancel. All tasks are finished."
-
-            current_task = todo_list.entries[todo_list.cur_idx].description
-            todo_list.mark_current_entry_as_cancelled()
-            return f"✗ Cancelled task: {current_task}\n\n" + format_todo()
-
-        elif action == "reset":
-            if not _has_current_task():
-                return "Error: No current task to reset. All tasks are finished."
-
-            current_task = todo_list.entries[todo_list.cur_idx].description
-            todo_list.mark_current_entry_as_unstarted()
-            return f"↻ Reset task: {current_task}\n\n" + format_todo()
-
-        elif action == "next":
-            if _has_current_task():
-                current = todo_list.entries[todo_list.cur_idx].description
-                return f"→ Next task: {current}"
-            else:
-                return "✓ All tasks completed!"
-
-        elif action == "clear":
-            todo_list.entries.clear()
-            todo_list.cur_idx = 0
-            return "✓ Cleared all tasks. Todo list is now empty."
-
-        else:  # show
-            return format_todo()
-
-    except IndexError as e:
-        return f"Error: Index out of range - {str(e)}"
-    except Exception as e:
-        return f"Error: An unexpected error occurred - {str(e)}"
-
-
-def format_todo():
-    """Format the todo list with enhanced visual indicators and statistics."""
-    if not todo_list.entries:
-        return "📝 Todo List is empty. Use 'add' action to create tasks."
-
-    text = "📝 Current Todo List:\n"
-    text += "=" * 50 + "\n"
-
-    for idx, entry in enumerate(todo_list.get_entries()):
-        # Visual indicators for different states
-        if idx == todo_list.cur_idx:
-            if entry.status == EntryStatus.UNSTARTED:
-                prefix = "→ "  # Current task
-            else:
-                prefix = "→ "  # Current position but task is done
-        else:
-            prefix = "  "
-
-        # Status icons
-        status_icon = {EntryStatus.COMPLETED: "✓", EntryStatus.CANCELLED: "✗", EntryStatus.UNSTARTED: "○"}.get(
-            entry.status, "?"
-        )
-
-        text += f"{prefix}{idx + 1:2d}. {status_icon} {entry.description} [{entry.status.value}]\n"
-    return text
-
-
-def _has_current_task():
-    """Check if there's a current task available to operate on."""
-    return todo_list.cur_idx < len(todo_list.entries)
+    return todo_list_tool
 
 
 if __name__ == "__main__":
-    todo_list = TodoList(todo_list=["Buy groceries", "Finish report", "Call mom"])
-    print(todo_list.get_entries())
-    todo_list.mark_current_entry_as_completed()
-    print(todo_list.get_entries())
-    todo_list.mark_current_entry_as_cancelled()
-    print(todo_list.get_entries())
-    todo_list.mark_current_entry_as_completed()
-    print(todo_list.get_entries())
+    tl = TodoList(descriptions=["Buy groceries", "Finish report", "Call mom"])
+    print(tl.format())
+    print("complete:", tl.complete())
+    print("cancel:", tl.cancel())
+    print("complete:", tl.complete())
+    print(tl.format())

@@ -1,10 +1,10 @@
-- [1. Core Features](#1-core-features)
+- [1. Core Feature](#1-core-feature)
 - [2. Quick Start](#2-quick-start)
   - [2.1. Run agent in host](#21-run-agent-in-host)
   - [2.2. Run agent in docker container](#22-run-agent-in-docker-container)
 - [3. Auto Mode](#3-auto-mode)
   - [3.1. Examples](#31-examples)
-- [4. Tools:](#4-tools)
+- [4. Tools](#4-tools)
 - [5. Embedding Knowledge Base (EKB)](#5-embedding-knowledge-base-ekb)
   - [5.1. Features](#51-features)
   - [5.2. Usage](#52-usage)
@@ -12,30 +12,28 @@
     - [5.3.1. Create Knowledge Base](#531-create-knowledge-base)
     - [5.3.2. Search and Manage](#532-search-and-manage)
 
-## 1. Core Features
+## 1. Core Feature
 
-- **🤖 Intelligent AI Agent**: Built on LangGraph framework with state management and memory support
-- **🔒 5-Level Security System**: Flexible auto-mode with manual, blacklist, whitelist, universal reject/accept modes
-- **📚 Embedding Knowledge Base (EKB)**: Vector database system for document retrieval with smart filtering
-- **🔧 MCP Tool Integration**: Support for Model Context Protocol (MCP) tools for extended functionality
-- **💻 Shell Command Execution**: Safe shell command execution with timeout and working directory control
-- **⚙️ Flexible Configuration**: Hydra-based configuration management with hierarchical config files
-- **🐳 Docker Support**: Secure containerized deployment with isolated environment for safe command execution
+- **AI Agent**: Built on LangGraph with in-memory conversation history and streaming output
+- **5-Level Auto Mode**: Configurable tool-call approval policy from fully manual to fully automatic
+- **MCP Tool Integration**: Loads tools from multiple MCP servers at startup; unavailable servers are skipped gracefully
+- **Shell Execution**: Runs shell commands via subprocess with configurable timeout and working directory
+- **Todo List**: In-process todo list tool for task tracking across turns
+- **Embedding Knowledge Base (EKB)**: Vector database for document retrieval, managed via `manage_kb.py`
+- **Hydra Configuration**: Hierarchical YAML config with command-line override support
+- **Docker Support**: Containerized deployment via provided Dockerfile and scripts
 
 ## 2. Quick Start
+
+Requires [uv](https://github.com/astral-sh/uv).
 
 ### 2.1. Run agent in host
 
 ```bash
-conda create -n agent python=3.12
-conda activate agent
-pip install -U -r requirements.txt
-pip install -U -r requirements_kb.txt
+bash shell_scripts/start.sh
 ```
 
-```bash
-python main.py
-```
+This script starts the configured MCP servers, waits until their ports are ready, then launches the agent. MCP servers are stopped automatically on exit.
 
 ### 2.2. Run agent in docker container
 
@@ -46,15 +44,17 @@ bash shell_scripts/start.docker.sh
 
 ## 3. Auto Mode
 
-Intelligent command processing with 5 security levels - from manual approval to full automation.
+Controls how tool calls are handled. Configured via `work.auto_mode`.
 
-| Mode                    | Config             | Behavior                              | Use Case                  |
-| ----------------------- | ------------------ | ------------------------------------- | ------------------------- |
-| 🤚 **Manual**           | `manual`           | All commands need confirmation        | Production, learning      |
-| 🚫 **Blacklist Reject** | `blacklist_reject` | Auto-reject dangerous, confirm others | Development               |
-| ⛔ **Universal Reject** | `universal_reject` | Auto-reject all commands              | Read-only scenarios       |
-| ✅ **Whitelist Accept** | `whitelist_accept` | Auto-approve safe, reject dangerous   | Balanced automation       |
-| 🟢 **Universal Accept** | `universal_accept` | Auto-approve everything ⚠️            | Trusted environments only |
+| Mode                 | Config             | Behavior                                                         |
+| -------------------- | ------------------ | ---------------------------------------------------------------- |
+| **Manual**           | `manual`           | Every tool call requires user confirmation                       |
+| **Blacklist Reject** | `blacklist_reject` | Auto-reject dangerous commands; ask for confirmation on others   |
+| **Universal Reject** | `universal_reject` | Auto-reject all tool calls                                       |
+| **Whitelist Accept** | `whitelist_accept` | Auto-approve safe tools/commands; ask for confirmation on others |
+| **Universal Accept** | `universal_accept` | Auto-approve all tool calls (use only in trusted environments)   |
+
+Safe and dangerous tools / shell commands are defined in `config/tool/default.yaml`.
 
 ### 3.1. Examples
 
@@ -64,56 +64,65 @@ bash shell_scripts/start.docker.sh \
   ++work.working_directory=/tmp/work_dir
 ```
 
-## 4. Tools:
+## 4. Tools
 
-| Tool Name                 | Description               |
-| ------------------------- | ------------------------- |
-| `search_knowledge_base`   | Search the knowledge base |
-| `run_shell_command_popen` | Run a shell command       |
+Local tools loaded at startup:
+
+| Tool Name                 | Description                            |
+| ------------------------- | -------------------------------------- |
+| `run_shell_command_popen` | Execute a shell command, return output |
+| `todo_list`               | Manage a per-session todo list         |
+| `search_knowledge_base`   | Search an EKB vector database          |
+
+MCP tools are loaded dynamically from the servers listed in `config/mcp/default.yaml`.
+
+To add a new local tool, implement it under `tools/` and register it in `tools/get_all_tools()`. `main.py` does not need to change.
 
 ## 5. Embedding Knowledge Base (EKB)
 
-Convert various document types to vector database for AI retrieval.
+Indexes documents into a vector database for semantic retrieval by the agent.
 
 ### 5.1. Features
 
-- **Smart Filtering**: Automatic .gitignore support and flexible regex patterns
-- **Configurable Processing**: Control include/exclude pattern order
-- **Multiple Formats**: Support for various document types
+- Gitignore-aware file filtering with configurable include/exclude regex patterns
+- Supports multiple knowledge bases, each stored independently
+- Managed separately from the agent via `manage_kb.py`
 
 ### 5.2. Usage
 
-Manage knowledge bases with `python manage_kb.py`:
+```bash
+python manage_kb.py <command> [options]
+```
 
-| Command  | Description                        |
-| -------- | ---------------------------------- |
-| `update` | Create or update knowledge base    |
-| `search` | Search knowledge base              |
-| `add`    | Add text content to knowledge base |
-| `status` | Show statistics                    |
-| `list`   | List all knowledge bases           |
+| Command  | Description                          |
+| -------- | ------------------------------------ |
+| `update` | Create or update a knowledge base    |
+| `search` | Search a knowledge base              |
+| `add`    | Add text content directly            |
+| `status` | Show statistics for a knowledge base |
+| `list`   | List all knowledge bases             |
 
-Use `python manage_kb.py <command> --help` for detailed options.
+Run `python manage_kb.py <command> --help` for full options.
 
 ### 5.3. Examples
 
 #### 5.3.1. Create Knowledge Base
 
 ```bash
-# From current directory
+# Index current directory
 python manage_kb.py update -n my_kb -s .
 
-# From specific directory
+# Index a specific directory
 python manage_kb.py update -n blog -s data/blog_content
 
-# Update existing knowledge base
+# Re-index (update) an existing knowledge base
 python manage_kb.py update -n blog
 ```
 
 #### 5.3.2. Search and Manage
 
 ```bash
-# Search knowledge base
+# Search
 python manage_kb.py search -n blog "machine learning concepts"
 
 # View statistics

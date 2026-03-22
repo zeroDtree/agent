@@ -13,6 +13,9 @@ import markdown
 import yaml
 
 from utils.constants import COMMENT_PATTERNS, get_language_from_extension, get_language_from_filename, is_code_file
+from utils.logger import get_logger
+
+logger = get_logger(name=__name__)
 
 
 class DocumentProcessor(ABC):
@@ -40,10 +43,13 @@ class DocumentProcessor(ABC):
         }
 
     def _safe_read_file(self, file_path: Path, encoding: str = "utf-8") -> Optional[str]:
-        """Safely read file content with error handling"""
-
-        with open(file_path, "r", encoding=encoding) as f:
-            return f.read()
+        """Read file content, returning None on any IO or encoding error."""
+        try:
+            with open(file_path, "r", encoding=encoding) as f:
+                return f.read()
+        except (OSError, UnicodeDecodeError) as e:
+            logger.warning("Failed to read file %s: %s", file_path, e)
+            return None
 
 
 class MarkdownProcessor(DocumentProcessor):
@@ -60,13 +66,8 @@ class MarkdownProcessor(DocumentProcessor):
         if content is None:
             return self._get_base_result(file_path)
 
-        # Parse front matter
         front_matter, markdown_content = self._parse_front_matter(content)
-
-        # Convert Markdown to HTML for enhanced content
         html_content = self._convert_to_html(markdown_content)
-
-        # Extract additional metadata
         metadata = self._extract_markdown_metadata(markdown_content, front_matter)
 
         result = self._get_base_result(file_path, markdown_content)
@@ -82,23 +83,19 @@ class MarkdownProcessor(DocumentProcessor):
                 "description": front_matter.get("description", ""),
             }
         )
-
         return result
 
     def _parse_front_matter(self, content: str) -> Tuple[Dict[str, Any], str]:
         """Parse YAML front matter from markdown content"""
-        front_matter = {}
-
         if content.startswith("---"):
             parts = content.split("---", 2)
             if len(parts) >= 3:
                 try:
                     front_matter = yaml.safe_load(parts[1]) or {}
-                    content = parts[2].strip()
+                    return front_matter, parts[2].strip()
                 except yaml.YAMLError as e:
-                    print(f"Failed to parse YAML front matter: {e}")
-
-        return front_matter, content
+                    logger.warning("Failed to parse YAML front matter: %s", e)
+        return {}, content
 
     def _convert_to_html(self, content: str) -> str:
         """Convert Markdown to HTML with extensions"""
@@ -112,34 +109,30 @@ class MarkdownProcessor(DocumentProcessor):
                 },
             )
         except Exception as e:
-            print(f"Failed to convert markdown to HTML: {e}")
+            logger.warning("Failed to convert markdown to HTML: %s", e)
             return content
 
     def _extract_markdown_metadata(self, content: str, front_matter: Dict) -> Dict[str, Any]:
         """Extract additional metadata from markdown content"""
-        metadata = {}
+        metadata: Dict[str, Any] = {}
 
-        # Extract headers for structure analysis
         headers = re.findall(r"^(#{1,6})\s+(.+)$", content, re.MULTILINE)
         if headers:
             metadata["headers"] = [{"level": len(level), "text": text.strip()} for level, text in headers]
 
-        # Extract code blocks
         code_blocks = re.findall(r"```(\w+)?\n(.*?)```", content, re.DOTALL)
         if code_blocks:
-            metadata["code_languages"] = list(set(lang for lang, _ in code_blocks if lang))
+            metadata["code_languages"] = list({lang for lang, _ in code_blocks if lang})
 
-        # Extract links
         links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", content)
         if links:
             metadata["external_links"] = [
-                {"text": text, "url": url} for text, url in links if url.startswith(("http", "https"))
+                {"text": text, "url": url} for text, url in links if url.startswith(("http://", "https://"))
             ]
 
-        # Word count and reading time estimation
         word_count = len(re.findall(r"\b\w+\b", content))
         metadata["word_count"] = word_count
-        metadata["reading_time"] = max(1, word_count // 200)  # ~200 words per minute
+        metadata["reading_time"] = max(1, word_count // 200)
 
         return metadata
 
@@ -148,39 +141,30 @@ class TextProcessor(DocumentProcessor):
     """Enhanced plain text document processor"""
 
     SUPPORTED_EXTENSIONS = {".txt", ".text", ".log", ".readme"}
+    SUPPORTED_FILENAMES = {"readme", "changelog", "license"}
 
     def can_process(self, file_path: Path) -> bool:
-        extension = file_path.suffix.lower()
-        filename = file_path.name.lower()
-        return extension in self.SUPPORTED_EXTENSIONS or filename in {
-            "readme",
-            "changelog",
-            "license",
-        }
+        return (
+            file_path.suffix.lower() in self.SUPPORTED_EXTENSIONS or file_path.name.lower() in self.SUPPORTED_FILENAMES
+        )
 
     def process(self, file_path: Path) -> Dict[str, Any]:
-        """Process plain text file with basic analysis"""
         content = self._safe_read_file(file_path)
         if content is None:
             return self._get_base_result(file_path)
 
-        metadata = self._analyze_text_content(content)
-
         result = self._get_base_result(file_path, content)
-        result["metadata"] = metadata
-
+        result["metadata"] = self._analyze_text_content(content)
         return result
 
     def _analyze_text_content(self, content: str) -> Dict[str, Any]:
-        """Analyze text content for basic statistics"""
         lines = content.splitlines()
-
         return {
             "line_count": len(lines),
             "word_count": len(re.findall(r"\b\w+\b", content)),
             "char_count": len(content),
             "blank_lines": sum(1 for line in lines if not line.strip()),
-            "encoding": "utf-8",  # Since we successfully read it
+            "encoding": "utf-8",
         }
 
 
@@ -191,7 +175,6 @@ class JSONProcessor(DocumentProcessor):
         return file_path.suffix.lower() == ".json"
 
     def process(self, file_path: Path) -> Dict[str, Any]:
-        """Process JSON file with comprehensive metadata extraction"""
         content = self._safe_read_file(file_path)
         if content is None:
             return self._get_base_result(file_path)
@@ -199,12 +182,11 @@ class JSONProcessor(DocumentProcessor):
         try:
             data = json.loads(content)
         except json.JSONDecodeError as e:
-            print(f"Failed to parse JSON file {file_path}: {e}")
+            logger.warning("Failed to parse JSON file %s: %s", file_path, e)
             return self._get_base_result(file_path, content)
 
-        # Extract text content and metadata
         text_content = self._extract_text_from_json(data)
-        metadata = self._extract_json_metadata(data, file_path)
+        metadata = self._extract_json_metadata(data)
 
         result = self._get_base_result(file_path, text_content)
         result.update(
@@ -216,53 +198,49 @@ class JSONProcessor(DocumentProcessor):
                 "categories": metadata.get("categories", []),
                 "author": metadata.get("author", ""),
                 "description": metadata.get("description", ""),
-                "raw_data": data,  # Store original data for advanced processing
+                "raw_data": data,
             }
         )
-
         return result
 
     def _extract_text_from_json(self, data: Any, max_depth: int = 10) -> str:
         """Extract text content from JSON data recursively with depth limit"""
         if max_depth <= 0:
             return str(data)
-
         if isinstance(data, str):
             return data
-        elif isinstance(data, dict):
+        if isinstance(data, dict):
             texts = []
-            # Prioritize content fields
-            content_fields = ["content", "text", "body", "description", "message"]
-
+            content_fields = {"content", "text", "body", "description", "message"}
             for field in content_fields:
                 if field in data:
                     texts.append(self._extract_text_from_json(data[field], max_depth - 1))
-
-            # Extract from other fields
             for key, value in data.items():
-                if key.lower() not in content_fields and isinstance(value, (str, dict, list)):
+                if key not in content_fields and isinstance(value, (str, dict, list)):
                     texts.append(self._extract_text_from_json(value, max_depth - 1))
-
             return "\n".join(filter(None, texts))
-        elif isinstance(data, list):
+        if isinstance(data, list):
             return "\n".join(self._extract_text_from_json(item, max_depth - 1) for item in data)
-        else:
-            return str(data)
+        return str(data)
 
-    def _extract_json_metadata(self, data: Any, file_path: Path) -> Dict[str, Any]:
-        """Extract comprehensive metadata from JSON structure"""
-        metadata = {}
+    def _extract_json_metadata(self, data: Any) -> Dict[str, Any]:
+        """Extract metadata from JSON structure"""
+        metadata: Dict[str, Any] = {}
 
         if isinstance(data, dict):
-            # Extract scalar metadata
             for key, value in data.items():
                 if isinstance(value, (str, int, float, bool)) and key != "content":
                     metadata[key] = value
-
-            # Analyze structure
             metadata.update(
                 {
-                    "json_structure": self._analyze_json_structure(data),
+                    "json_structure": {
+                        k: (
+                            "object"
+                            if isinstance(v, dict)
+                            else f"array[{len(v)}]" if isinstance(v, list) else type(v).__name__
+                        )
+                        for k, v in data.items()
+                    },
                     "total_keys": len(data),
                     "nested_objects": sum(1 for v in data.values() if isinstance(v, dict)),
                     "arrays": sum(1 for v in data.values() if isinstance(v, list)),
@@ -273,48 +251,35 @@ class JSONProcessor(DocumentProcessor):
                 {
                     "json_structure": "array",
                     "array_length": len(data),
-                    "item_types": list(set(type(item).__name__ for item in data)),
+                    "item_types": list({type(item).__name__ for item in data}),
                 }
             )
 
         return metadata
 
-    def _analyze_json_structure(self, data: Dict) -> Dict[str, Any]:
-        """Analyze JSON structure for schema-like information"""
-        structure = {}
-
-        for key, value in data.items():
-            if isinstance(value, dict):
-                structure[key] = "object"
-            elif isinstance(value, list):
-                structure[key] = f"array[{len(value)}]"
-            else:
-                structure[key] = type(value).__name__
-
-        return structure
-
 
 class CodeProcessor(DocumentProcessor):
     """Enhanced code file processor with comprehensive language support"""
 
+    # Metadata keys that may appear in header comments
+    _HEADER_PATTERNS = [
+        (r"@?author:?\s*(.+)", "author"),
+        (r"@?description:?\s*(.+)", "description"),
+        (r"@?version:?\s*(.+)", "version"),
+        (r"@?license:?\s*(.+)", "license"),
+        (r"@?copyright:?\s*(.+)", "copyright"),
+    ]
+
     def can_process(self, file_path: Path) -> bool:
-        """Check if this is a code file using optimized lookup"""
         return is_code_file(str(file_path))
 
     def process(self, file_path: Path) -> Dict[str, Any]:
-        """Process code file with comprehensive analysis"""
         content = self._safe_read_file(file_path)
         if content is None:
             return self._get_base_result(file_path)
 
-        # Detect programming language
         language = self._detect_language(file_path)
-
-        # Extract comprehensive metadata
-        metadata = self._extract_code_metadata(content, language, file_path)
-
-        # Get file statistics
-        file_stats = file_path.stat()
+        metadata = self._extract_code_metadata(content, language)
 
         result = self._get_base_result(file_path, content)
         result.update(
@@ -324,135 +289,94 @@ class CodeProcessor(DocumentProcessor):
                 "language": language,
                 "file_type": "code",
                 "extension": file_path.suffix.lower(),
-                "size": file_stats.st_size,
+                "size": file_path.stat().st_size,
                 "lines": len(content.splitlines()),
-                "tags": [language, "code", metadata.get("primary_category", "source")],
+                "tags": [language, "code"],
                 "categories": ["source_code"],
                 "description": f"{language.title()} source code file",
             }
         )
-
         return result
 
     def _detect_language(self, file_path: Path) -> str:
-        """Detect programming language with improved accuracy"""
-        extension = file_path.suffix.lower()
-        filename = file_path.name.lower()
-
-        # Check special filenames first
-        lang = get_language_from_filename(filename)
+        """Detect programming language from filename then extension."""
+        lang = get_language_from_filename(file_path.name.lower())
         if lang != "unknown":
             return lang
+        return get_language_from_extension(file_path.suffix.lower())
 
-        # Check extension mapping
-        return get_language_from_extension(extension)
-
-    def _extract_code_metadata(self, content: str, language: str, file_path: Path) -> Dict[str, Any]:
-        """Extract comprehensive metadata from code content"""
-        metadata = {}
+    def _extract_code_metadata(self, content: str, language: str) -> Dict[str, Any]:
         lines = content.splitlines()
+        metadata: Dict[str, Any] = {}
 
-        # Extract header comments and docstrings
-        header_info = self._extract_header_metadata(lines, language)
-        metadata.update(header_info)
+        metadata.update(self._extract_header_metadata(lines, language))
+        metadata["code_stats"] = self._extract_code_stats(content, language)
 
-        # Generate code statistics
-        stats = self._extract_code_stats(content, language)
-        metadata["code_stats"] = stats
-
-        # Analyze imports and dependencies
         dependencies = self._extract_dependencies(lines, language)
         if dependencies:
             metadata["dependencies"] = dependencies
 
-        # Extract function and class signatures
         signatures = self._extract_signatures(lines, language)
         if signatures:
             metadata["signatures"] = signatures
 
-        # Detect code complexity indicators
-        complexity = self._analyze_complexity(content, language)
-        metadata["complexity"] = complexity
-
+        metadata["complexity"] = self._analyze_complexity(content, language)
         return metadata
 
     def _extract_header_metadata(self, lines: List[str], language: str) -> Dict[str, Any]:
-        """Extract metadata from file headers and comments"""
-        metadata = {}
-
-        # Get comment patterns for the language
-        single_comment = COMMENT_PATTERNS.get("single_line", {}).get(language)
-        block_start = COMMENT_PATTERNS.get("block_start", {}).get(language)
-        block_end = COMMENT_PATTERNS.get("block_end", {}).get(language)
+        metadata: Dict[str, Any] = {}
+        single_comment = COMMENT_PATTERNS["single_line"].get(language)
+        block_start = COMMENT_PATTERNS["block_start"].get(language)
+        block_end = COMMENT_PATTERNS["block_end"].get(language)
 
         if single_comment:
-            metadata.update(self._extract_single_line_metadata(lines, single_comment))
-
+            metadata.update(self._scan_single_line_comments(lines[:30], single_comment))
         if block_start and block_end:
-            metadata.update(self._extract_block_comment_metadata(lines, block_start, block_end))
+            metadata.update(self._scan_block_comments(lines[:50], block_start, block_end))
 
         return metadata
 
-    def _extract_single_line_metadata(self, lines: List[str], comment_char: str) -> Dict[str, Any]:
-        """Extract metadata from single-line comments"""
-        metadata = {}
-
-        for line in lines[:30]:  # Check first 30 lines
+    def _scan_single_line_comments(self, lines: List[str], comment_char: str) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
+        prefix_len = len(comment_char)
+        for line in lines:
             stripped = line.strip()
-            if stripped.startswith(comment_char):
-                comment = stripped[len(comment_char) :].strip()
-
-                # Look for common metadata patterns
-                for pattern, key in [
-                    (r"@?author:?\s*(.+)", "author"),
-                    (r"@?description:?\s*(.+)", "description"),
-                    (r"@?version:?\s*(.+)", "version"),
-                    (r"@?license:?\s*(.+)", "license"),
-                    (r"@?copyright:?\s*(.+)", "copyright"),
-                ]:
-                    match = re.match(pattern, comment, re.IGNORECASE)
-                    if match:
-                        metadata[key] = match.group(1).strip()
-                        break
-
+            if not stripped.startswith(comment_char):
+                continue
+            comment = stripped[prefix_len:].strip()
+            for pattern, key in self._HEADER_PATTERNS:
+                m = re.match(pattern, comment, re.IGNORECASE)
+                if m:
+                    metadata[key] = m.group(1).strip()
+                    break
         return metadata
 
-    def _extract_block_comment_metadata(self, lines: List[str], start: str, end: str) -> Dict[str, Any]:
-        """Extract metadata from block comments"""
-        metadata = {}
+    def _scan_block_comments(self, lines: List[str], start: str, end: str) -> Dict[str, Any]:
+        metadata: Dict[str, Any] = {}
         in_block = False
-
-        for line in lines[:50]:  # Check first 50 lines
+        for line in lines:
             stripped = line.strip()
-
             if start in stripped:
                 in_block = True
                 continue
             if end in stripped:
                 in_block = False
                 continue
-
-            if in_block:
-                # Clean comment content
-                comment = stripped.lstrip("*").strip()
-                if comment:
-                    # Look for metadata patterns
-                    for pattern, key in [
-                        (r"@?author:?\s*(.+)", "author"),
-                        (r"@?description:?\s*(.+)", "description"),
-                        (r"@?version:?\s*(.+)", "version"),
-                    ]:
-                        match = re.match(pattern, comment, re.IGNORECASE)
-                        if match:
-                            metadata[key] = match.group(1).strip()
-                            break
-
+            if not in_block:
+                continue
+            comment = stripped.lstrip("*").strip()
+            if not comment:
+                continue
+            for pattern, key in self._HEADER_PATTERNS:
+                m = re.match(pattern, comment, re.IGNORECASE)
+                if m:
+                    metadata[key] = m.group(1).strip()
+                    break
         return metadata
 
     def _extract_code_stats(self, content: str, language: str) -> Dict[str, Any]:
-        """Generate comprehensive code statistics"""
         lines = content.splitlines()
-        stats = {
+        stats: Dict[str, Any] = {
             "total_lines": len(lines),
             "blank_lines": 0,
             "comment_lines": 0,
@@ -463,137 +387,108 @@ class CodeProcessor(DocumentProcessor):
             "complexity_indicators": 0,
         }
 
-        single_comment = COMMENT_PATTERNS.get("single_line", {}).get(language)
-        block_start = COMMENT_PATTERNS.get("block_start", {}).get(language)
-        block_end = COMMENT_PATTERNS.get("block_end", {}).get(language)
-
+        single_comment = COMMENT_PATTERNS["single_line"].get(language)
+        block_start = COMMENT_PATTERNS["block_start"].get(language)
+        block_end = COMMENT_PATTERNS["block_end"].get(language)
         in_block_comment = False
 
         for line in lines:
             stripped = line.strip()
-
             if not stripped:
                 stats["blank_lines"] += 1
                 continue
-
-            # Check for block comments
             if block_start and block_start in stripped:
                 in_block_comment = True
             if block_end and block_end in stripped:
                 in_block_comment = False
                 stats["comment_lines"] += 1
                 continue
-
             if in_block_comment:
                 stats["comment_lines"] += 1
                 continue
-
-            # Check for single-line comments
             if single_comment and stripped.startswith(single_comment):
                 stats["comment_lines"] += 1
                 continue
-
-            # This is a code line
             stats["code_lines"] += 1
-
-            # Count language-specific constructs
             self._count_language_constructs(stripped, language, stats)
 
         return stats
 
     def _count_language_constructs(self, line: str, language: str, stats: Dict[str, Any]) -> None:
-        """Count language-specific constructs like functions, classes, etc."""
-        line.lower()
-
         if language == "python":
-            if line.strip().startswith("def "):
+            if line.startswith("def "):
                 stats["functions"] += 1
-            elif line.strip().startswith("class "):
+            elif line.startswith("class "):
                 stats["classes"] += 1
-            elif line.strip().startswith(("import ", "from ")):
+            elif line.startswith(("import ", "from ")):
                 stats["imports"] += 1
-            elif any(keyword in line for keyword in ["if ", "for ", "while ", "try:", "except"]):
+            elif any(kw in line for kw in ("if ", "elif ", "for ", "while ", "try:", "except")):
                 stats["complexity_indicators"] += 1
 
-        elif language in ["javascript", "typescript"]:
+        elif language in ("javascript", "typescript"):
             if "function " in line or "=>" in line:
                 stats["functions"] += 1
-            elif line.strip().startswith("class "):
+            elif line.startswith("class "):
                 stats["classes"] += 1
-            elif line.strip().startswith(("import ", "require(")):
+            elif line.startswith(("import ", "require(")):
                 stats["imports"] += 1
-            elif any(keyword in line for keyword in ["if(", "if ", "for(", "while(", "switch("]):
+            elif any(kw in line for kw in ("if(", "if ", "for(", "while(", "switch(")):
                 stats["complexity_indicators"] += 1
 
         elif language == "java":
-            if re.search(r"\b\w+\s*\([^)]*\)\s*\{", line):  # Method signature
+            if re.search(r"\b\w+\s*\([^)]*\)\s*\{", line):
                 stats["functions"] += 1
-            elif line.strip().startswith(("public class", "class ", "interface ")):
+            elif line.startswith(("public class", "class ", "interface ")):
                 stats["classes"] += 1
-            elif line.strip().startswith("import "):
+            elif line.startswith("import "):
                 stats["imports"] += 1
-            elif any(keyword in line for keyword in ["if(", "if ", "for(", "while(", "switch("]):
+            elif any(kw in line for kw in ("if(", "if ", "for(", "while(", "switch(")):
                 stats["complexity_indicators"] += 1
 
     def _extract_dependencies(self, lines: List[str], language: str) -> List[str]:
-        """Extract imported modules and dependencies"""
-        dependencies = []
-
+        deps: List[str] = []
         for line in lines:
             stripped = line.strip()
-
             if language == "python":
                 if stripped.startswith("import "):
-                    dep = stripped[7:].split(" as ")[0].split(".")[0]
-                    dependencies.append(dep)
+                    deps.append(stripped[7:].split(" as ")[0].split(".")[0].strip())
                 elif stripped.startswith("from "):
-                    dep = stripped[5:].split(" import ")[0].split(".")[0]
-                    dependencies.append(dep)
-
-            elif language in ["javascript", "typescript"]:
+                    deps.append(stripped[5:].split(" import ")[0].split(".")[0].strip())
+            elif language in ("javascript", "typescript"):
                 if stripped.startswith("import "):
-                    match = re.search(r'from [\'"]([^\'"]+)[\'"]', stripped)
-                    if match:
-                        dependencies.append(match.group(1))
+                    m = re.search(r'from [\'"]([^\'"]+)[\'"]', stripped)
+                    if m:
+                        deps.append(m.group(1))
                 elif "require(" in stripped:
-                    match = re.search(r'require\([\'"]([^\'"]+)[\'"]\)', stripped)
-                    if match:
-                        dependencies.append(match.group(1))
-
+                    m = re.search(r'require\([\'"]([^\'"]+)[\'"]\)', stripped)
+                    if m:
+                        deps.append(m.group(1))
             elif language == "java":
                 if stripped.startswith("import "):
-                    dep = stripped[7:].rstrip(";").split(".")[0]
-                    dependencies.append(dep)
+                    deps.append(stripped[7:].rstrip(";").split(".")[0])
+        return list(set(deps))
 
-        return list(set(dependencies))  # Remove duplicates
-
-    def _extract_signatures(self, lines: List[str], language: str) -> List[Dict[str, str]]:
-        """Extract function and class signatures"""
+    def _extract_signatures(self, lines: List[str], language: str) -> List[Dict[str, Any]]:
         signatures = []
-
         for i, line in enumerate(lines):
             stripped = line.strip()
-
             if language == "python":
                 if stripped.startswith("def ") or stripped.startswith("class "):
                     signatures.append(
                         {
-                            "type": ("function" if stripped.startswith("def ") else "class"),
+                            "type": "function" if stripped.startswith("def ") else "class",
                             "signature": stripped,
                             "line": i + 1,
                         }
                     )
-
-            elif language in ["javascript", "typescript"]:
+            elif language in ("javascript", "typescript"):
                 if "function " in stripped or "=>" in stripped or stripped.startswith("class "):
                     sig_type = "class" if stripped.startswith("class ") else "function"
                     signatures.append({"type": sig_type, "signature": stripped, "line": i + 1})
-
         return signatures
 
     def _analyze_complexity(self, content: str, language: str) -> Dict[str, Any]:
-        """Analyze code complexity indicators"""
-        complexity = {
+        complexity: Dict[str, Any] = {
             "cyclomatic_complexity": 0,
             "nesting_level": 0,
             "long_functions": 0,
@@ -605,41 +500,32 @@ class CodeProcessor(DocumentProcessor):
         in_function = False
 
         for line in lines:
-            # Calculate indentation
             indent = len(line) - len(line.lstrip())
-            max_indent = max(max_indent, indent)
+            if indent > max_indent:
+                max_indent = indent
 
             stripped = line.strip()
-
-            # Count complexity indicators
             if language == "python":
-                if any(
-                    keyword in stripped
-                    for keyword in [
-                        "if ",
-                        "elif ",
-                        "for ",
-                        "while ",
-                        "try:",
-                        "except",
-                        "with ",
-                    ]
-                ):
+                if any(kw in stripped for kw in ("if ", "elif ", "for ", "while ", "try:", "except", "with ")):
                     complexity["cyclomatic_complexity"] += 1
 
                 if stripped.startswith("def "):
+                    if in_function and function_lines > 50:
+                        complexity["long_functions"] += 1
                     in_function = True
                     function_lines = 0
                 elif in_function:
-                    if stripped and not stripped.startswith(" ") and not stripped.startswith("\t"):
-                        if function_lines > 50:  # Long function threshold
+                    if stripped and not line[0] in (" ", "\t"):
+                        if function_lines > 50:
                             complexity["long_functions"] += 1
                         in_function = False
                     else:
                         function_lines += 1
 
-        complexity["nesting_level"] = max_indent // 4 if language == "python" else max_indent // 2
+        if in_function and function_lines > 50:
+            complexity["long_functions"] += 1
 
+        complexity["nesting_level"] = max_indent // 4 if language == "python" else max_indent // 2
         return complexity
 
 
@@ -651,29 +537,30 @@ class CodeProcessor(DocumentProcessor):
 class ProcessorFactory:
     """Factory class for document processors with automatic registration"""
 
-    def __init__(self):
-        self._processors = [
+    def __init__(self, custom_processors: Optional[List[DocumentProcessor]] = None):
+        self._processors: List[DocumentProcessor] = [
             MarkdownProcessor(),
             JSONProcessor(),
             CodeProcessor(),
-            TextProcessor(),  # Keep as fallback
+            TextProcessor(),  # fallback
         ]
+        if custom_processors:
+            self._processors = custom_processors + self._processors
 
     def get_processor(self, file_path: Path) -> Optional[DocumentProcessor]:
-        """Get appropriate processor for file path"""
+        """Return the first processor that can handle the given file."""
         for processor in self._processors:
             if processor.can_process(file_path):
                 return processor
         return None
 
     def process_file(self, file_path: Path) -> Dict[str, Any]:
-        """Process file using appropriate processor"""
+        """Process file using the appropriate processor."""
         processor = self.get_processor(file_path)
         if processor:
             return processor.process(file_path)
 
-        # Fallback for unsupported files
-        print(f"No processor found for {file_path}")
+        logger.debug("No processor found for %s", file_path)
         return {
             "content": "",
             "metadata": {"error": "Unsupported file type"},
@@ -699,10 +586,8 @@ def process_document(file_path: Path) -> Dict[str, Any]:
 def get_supported_extensions() -> Set[str]:
     """Get all supported file extensions"""
     factory = ProcessorFactory()
-    extensions = set()
-
+    extensions: Set[str] = set()
     for processor in factory._processors:
         if hasattr(processor, "SUPPORTED_EXTENSIONS"):
             extensions.update(processor.SUPPORTED_EXTENSIONS)
-
     return extensions

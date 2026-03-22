@@ -1,0 +1,31 @@
+[project]
+name = "agent"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+	"Flask",
+	"flask_cors",
+	"langchain_core",
+	"langchain",
+	"langchain_chroma",
+	"langchain_community",
+	"langchain_huggingface",
+	"langchain_openai",
+	"langchain-text-splitters",
+	"langgraph",
+	"Markdown",
+	"PyYAML",
+	"typing_extensions",
+	"langchain-mcp-adapters",
+	"fastmcp",
+	"hydra-core",
+	"omegaconf",
+	"gnureadline>=8.3.3",
+]
+
+[dependency-groups]
+lint = ["black", "pylint", "autoflake"]
+ekb = ["sentence-transformers"]
+dev = [{ include-group = "lint" }, { include-group = "ekb" }]

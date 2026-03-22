@@ -4,15 +4,19 @@ from langchain_core.tools import tool
 
 from config.config_class import WorkConfig
 
+_MAX_OUTPUT_CHARS = 20_000
+
 
 def get_run_shell_command_popen_tool(work_config: WorkConfig):
 
     @tool
     def run_shell_command_popen_tool(command: str) -> str:
-        """Execute shell command with directory restrictions and path validation. Input a string command and return the command output."""
-        try:
+        """Execute a shell command and return its output.
 
-            # Execute command uniformly through shell
+        Returns a structured result containing exit code, stdout, and stderr so
+        the caller can distinguish between successful and failed executions.
+        """
+        try:
             result = subprocess.run(
                 command,
                 shell=True,
@@ -22,18 +26,26 @@ def get_run_shell_command_popen_tool(work_config: WorkConfig):
                 cwd=work_config.working_directory,
             )
 
-            output = result.stdout
-            if result.stderr:
-                output += f"\nError: {result.stderr}"
+            stdout = result.stdout
+            stderr = result.stderr
 
-            return output
+            if len(stdout) > _MAX_OUTPUT_CHARS:
+                stdout = stdout[:_MAX_OUTPUT_CHARS] + f"\n[...truncated, {len(stdout)} chars total]"
+            if len(stderr) > _MAX_OUTPUT_CHARS:
+                stderr = stderr[:_MAX_OUTPUT_CHARS] + f"\n[...truncated, {len(stderr)} chars total]"
+
+            parts = [f"exit_code: {result.returncode}"]
+            if stdout:
+                parts.append(f"stdout:\n{stdout}")
+            if stderr:
+                parts.append(f"stderr:\n{stderr}")
+
+            return "\n".join(parts)
 
         except subprocess.TimeoutExpired:
-            error_msg = f"Command timeout: {command}"
-            return error_msg
+            return f"exit_code: -1\nerror: command timed out after {work_config.command_timeout}s\ncommand: {command}"
 
         except Exception as e:
-            error_msg = f"Execution error: {str(e)}"
-            return error_msg
+            return f"exit_code: -1\nerror: {e}\ncommand: {command}"
 
     return run_shell_command_popen_tool
