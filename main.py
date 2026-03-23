@@ -1,13 +1,19 @@
 import asyncio
 
-import gnureadline  # noqa: F401 – enables readline history/editing in input()
+import gnureadline  # noqa: F401
 import hydra
 import omegaconf
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from omegaconf import DictConfig
 
-from config.config_class import AutoMode, GraphConfig, LLMConfig, ToolConfig, WorkConfig
+from config.config_class import (
+    AutoMode,
+    GraphConfig,
+    LLMConfig,
+    ToolConfig,
+    WorkConfig,
+)
 from graphs.graph import Graph
 from tools import get_all_tools
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
@@ -18,7 +24,9 @@ from utils.preset import preset_messages
 # ---------------------------------------------------------------------------
 
 
-def _build_configs(cfg: DictConfig) -> tuple[LoggerConfig, LLMConfig, WorkConfig, GraphConfig, ToolConfig]:
+def _build_configs(
+    cfg: DictConfig,
+) -> tuple[LoggerConfig, LLMConfig, WorkConfig, GraphConfig, ToolConfig]:
     log_config = LoggerConfig(log_dir=cfg.log.log_dir, log_level=cfg.log.log_level)
     llm_config = LLMConfig(
         model_name=cfg.llm.model_name,
