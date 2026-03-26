@@ -1,8 +1,8 @@
+from config.config_class import WorkConfig
+
+from .embedding_knowledge_base import search_knowledge_base
 from .shell import get_run_shell_command_popen_tool
 from .todo_list import get_todo_list_tool
-from .embedding_knowledge_base import search_knowledge_base
-
-from config.config_class import WorkConfig
 
 
 def get_all_tools(work_config: WorkConfig) -> list:
@@ -12,7 +12,7 @@ def get_all_tools(work_config: WorkConfig) -> list:
     """
     return [
         get_run_shell_command_popen_tool(work_config=work_config),
-        get_todo_list_tool(),
+        # get_todo_list_tool(),
         search_knowledge_base,
     ]
 

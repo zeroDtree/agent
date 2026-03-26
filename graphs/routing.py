@@ -6,9 +6,7 @@ from config.config_class import AutoMode, ToolConfig, WorkConfig
 from graphs.state import State
 
 
-def make_chatbot_router(
-    work_config: WorkConfig, tool_config: ToolConfig, logger: logging.Logger | None = None
-):
+def make_chatbot_router(work_config: WorkConfig, tool_config: ToolConfig, logger: logging.Logger | None = None):
     """Return a routing function for the chatbot node's conditional edges."""
 
     def chatbot_route(state: State):

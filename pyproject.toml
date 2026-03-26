@@ -24,7 +24,8 @@ dependencies = [
 	"omegaconf",
 	"gnureadline>=8.3.3",
 	"ruff",
-	"ty"
+	"ty",
+	"prompt-toolkit>=3.0.52",
 ]
 
 [dependency-groups]

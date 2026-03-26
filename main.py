@@ -1,19 +1,18 @@
 import asyncio
+import json
+import os
 
 import gnureadline  # noqa: F401
 import hydra
 import omegaconf
-from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from omegaconf import DictConfig
+from prompt_toolkit import PromptSession
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.history import InMemoryHistory
 
-from config.config_class import (
-    AutoMode,
-    GraphConfig,
-    LLMConfig,
-    ToolConfig,
-    WorkConfig,
-)
+from config.config_class import AutoMode, GraphConfig, LLMConfig, ToolConfig, WorkConfig
 from graphs.graph import Graph
 from tools import get_all_tools
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
@@ -66,8 +65,6 @@ def _build_configs(
 async def _get_mcp_tools(mcp_config) -> list:
     import logging
 
-    # os.environ.setdefault("NO_PROXY", "127.0.0.1,localhost,::1")
-
     logger = logging.getLogger(__name__)
     client = MultiServerMCPClient(dict(mcp_config))
     all_tools: list = []
@@ -82,30 +79,40 @@ async def _get_mcp_tools(mcp_config) -> list:
 
 
 # ---------------------------------------------------------------------------
-# Streaming output
+# Message helpers (streaming)
 # ---------------------------------------------------------------------------
 
 
-async def _print_stream(events, logger):
-    printed_ids: set = set()
-    async for event in events:
-        messages = event.get("messages") or []
-        if not messages:
-            continue
+def _message_text(msg: AIMessage | AIMessageChunk | ToolMessage) -> str:
+    c = getattr(msg, "content", None)
+    if isinstance(c, str):
+        return c
+    if isinstance(c, list):
+        parts: list[str] = []
+        for b in c:
+            if isinstance(b, dict) and b.get("type") == "text":
+                parts.append(str(b.get("text", "")))
+            elif isinstance(b, str):
+                parts.append(b)
+        return "".join(parts)
+    return ""
 
-        # Collect consecutive AI/tool messages from the tail
-        recent: list = []
-        for msg in reversed(messages):
-            if isinstance(msg, (AIMessage, ToolMessage)):
-                recent.append(msg)
-            else:
-                break
 
-        for msg in reversed(recent):
-            msg_id = getattr(msg, "id", None) or hash(str(msg.content))
-            if msg_id not in printed_ids:
-                msg.pretty_print()
-                printed_ids.add(msg_id)
+def _tail_ai_tool_messages(messages: list) -> list:
+    recent: list = []
+    for msg in reversed(messages):
+        if isinstance(msg, (AIMessage, ToolMessage)):
+            recent.append(msg)
+        else:
+            break
+    return list(reversed(recent))
+
+
+def _graph_run_config(cfg: DictConfig) -> dict:
+    return {
+        "configurable": {"thread_id": cfg.system.thread_id},
+        "recursion_limit": cfg.system.recursion_limit,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -113,30 +120,186 @@ async def _print_stream(events, logger):
 # ---------------------------------------------------------------------------
 
 
-async def _chat_loop(graph, cfg: DictConfig, logger):
+async def chat_loop(graph, cfg, logger, tools: list):
+    session = PromptSession(
+        history=InMemoryHistory(),
+        auto_suggest=AutoSuggestFromHistory(),
+    )
+
     is_first = True
+    conversation_history: list = []
+
+    print("Welcome to MyCodex CLI!")
+    print(f"Using model: {cfg.llm.model_name}")
+    stream_hint = (
+        "token streaming on" if cfg.llm.streaming else "token streaming off (set llm.streaming=true for stream)"
+    )
+    print(f"Type 'exit' to quit. Enter sends; paste multi-line text as one message. ({stream_hint})\n")
+
     while True:
         try:
-            input_str = input("You: ")
-            messages = (preset_messages if is_first else []) + [HumanMessage(content=input_str)]
+            user_input = await session.prompt_async("> ", multiline=False)
+            if not user_input.strip():
+                continue
+
+            if user_input.lower() in ["exit", "quit"]:
+                print("Exiting CLI...")
+                break
+
+            if user_input.startswith("!help"):
+                print(
+                    "Commands:\n"
+                    "  !tool list                   - list available tools\n"
+                    "  !tool <name> [json_args]     - call a tool directly\n"
+                    "  !save <filename>             - save conversation to file\n"
+                    "  !load <filename>             - load conversation from file\n"
+                    "  !clear                       - clear conversation history\n"
+                    "  !history                     - show conversation history\n"
+                    "  exit / quit                  - exit CLI\n"
+                )
+                continue
+
+            if user_input.startswith("!save"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("Usage: !save <filename>")
+                    continue
+                filename = parts[1].strip()
+                try:
+                    data = [{"type": type(m).__name__, "content": m.content} for m in conversation_history]
+                    with open(filename, "w") as f:
+                        json.dump(data, f, indent=2, ensure_ascii=False)
+                    print(f"Conversation saved to {filename} ({len(data)} messages)")
+                except Exception as e:
+                    print(f"Save failed: {e}")
+                continue
+
+            if user_input.startswith("!load"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) < 2:
+                    print("Usage: !load <filename>")
+                    continue
+                filename = parts[1].strip()
+                if not os.path.exists(filename):
+                    print(f"File not found: {filename}")
+                    continue
+                try:
+                    with open(filename, "r") as f:
+                        loaded = json.load(f)
+                    type_map = {"HumanMessage": HumanMessage, "AIMessage": AIMessage, "ToolMessage": ToolMessage}
+                    for item in loaded:
+                        cls = type_map.get(item.get("type"), HumanMessage)
+                        conversation_history.append(cls(content=item["content"]))
+                    print(f"Loaded {len(loaded)} messages from {filename}")
+                except Exception as e:
+                    print(f"Load failed: {e}")
+                continue
+
+            if user_input.startswith("!clear"):
+                conversation_history.clear()
+                is_first = True
+                print("Conversation history cleared.")
+                continue
+
+            if user_input.startswith("!history"):
+                if not conversation_history:
+                    print("(empty)")
+                for i, m in enumerate(conversation_history):
+                    role = type(m).__name__.replace("Message", "")
+                    content = str(m.content)[:120]
+                    print(f"[{i}] {role}: {content}")
+                continue
+
+            if user_input.startswith("!tool"):
+                parts = user_input.split(maxsplit=2)
+                sub = parts[1] if len(parts) > 1 else "list"
+                if sub == "list":
+                    if not tools:
+                        print("(no tools available)")
+                    for t in tools:
+                        print(f"  {t.name}")
+                else:
+                    tool_name = sub
+                    raw_args = parts[2] if len(parts) == 3 else "{}"
+                    matched = next((t for t in tools if t.name == tool_name), None)
+                    if not matched:
+                        print(f"Unknown tool: {tool_name}. Use '!tool list' to see available tools.")
+                    else:
+                        try:
+                            args = json.loads(raw_args)
+                            result = await matched.ainvoke(args)
+                            print(result)
+                        except Exception as e:
+                            print(f"Tool call failed: {e}")
+                continue
+
+            messages = (preset_messages if is_first else []) + conversation_history + [HumanMessage(content=user_input)]
             is_first = False
 
-            events = graph.astream(
-                input={"messages": messages},
-                config={
-                    "configurable": {"thread_id": cfg.system.thread_id},
-                    "recursion_limit": cfg.system.recursion_limit,
-                },
-                stream_mode=cfg.system.stream_mode,
-            )
-            await _print_stream(events, logger)
+            streaming_printed_tool_keys: set = set()
+            streaming_appended_history_keys: set = set()
+            nonstreaming_emitted_message_keys: set = set()
+            streamed_ai = False
+
+            if cfg.llm.streaming:
+                async for part in graph.astream(
+                    {"messages": messages},
+                    config=_graph_run_config(cfg),
+                    stream_mode=["messages", "values"],
+                    version="v2",
+                ):
+                    if part["type"] == "messages":
+                        msg, _meta = part["data"]
+                        if isinstance(msg, AIMessageChunk):
+                            t = _message_text(msg)
+                            if t:
+                                print(t, end="", flush=True)
+                                streamed_ai = True
+                        elif isinstance(msg, AIMessage):
+                            if not streamed_ai:
+                                text = _message_text(msg)
+                                if text:
+                                    print(text)
+                        elif isinstance(msg, ToolMessage):
+                            tid = getattr(msg, "id", None) or hash(str(msg.content))
+                            if tid not in streaming_printed_tool_keys:
+                                print(f"\n[Tool: {msg.name}]\n{msg.content}")
+                                streaming_printed_tool_keys.add(tid)
+                    elif part["type"] == "values":
+                        state = part["data"]
+                        msgs = state.get("messages") or []
+                        for m in _tail_ai_tool_messages(msgs):
+                            mid = getattr(m, "id", None) or hash(str(m.content))
+                            if mid in streaming_appended_history_keys:
+                                continue
+                            conversation_history.append(m)
+                            streaming_appended_history_keys.add(mid)
+                if streamed_ai:
+                    print()
+            else:
+                async for event in graph.astream(
+                    {"messages": messages},
+                    config=_graph_run_config(cfg),
+                    stream_mode=cfg.system.stream_mode,
+                ):
+                    msgs = event.get("messages") or []
+                    if not msgs:
+                        continue
+                    for msg in _tail_ai_tool_messages(msgs):
+                        msg_id = getattr(msg, "id", None) or hash(str(msg.content))
+                        if msg_id not in nonstreaming_emitted_message_keys:
+                            print(msg.content)
+                            nonstreaming_emitted_message_keys.add(msg_id)
+                            conversation_history.append(msg)
+
+            conversation_history.append(HumanMessage(content=user_input))
 
         except KeyboardInterrupt:
-            print("\n\nExiting program")
+            print("\nExiting CLI...")
             break
         except Exception as e:
-            logger.error(f"Error processing request: {e}")
-            print(f"Error occurred, please try again: {e}")
+            logger.error(f"Error: {e}")
+            print(f"Error occurred: {e}")
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +326,7 @@ async def async_main(cfg: DictConfig):
             tool_config=tool_config,
         ).create_graph(need_memory=True, tools=tools)
 
-        await _chat_loop(graph, cfg, logger)
+        await chat_loop(graph, cfg, logger, tools)
 
     except Exception as e:
         logger.error(f"System startup failed: {e}")

@@ -58,7 +58,7 @@ def log_command_execution(
     logger.info(log_entry)
 
     # Write to dedicated command log file
-    with open(f'{log_config.log_dir}/commands_{datetime.now().strftime("%Y%m%d")}.log', "a") as f:
+    with open(f"{log_config.log_dir}/commands_{datetime.now().strftime('%Y%m%d')}.log", "a") as f:
         f.write(log_entry + "\n")
 
 
