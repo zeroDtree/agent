@@ -1,4 +1,5 @@
 import logging
+from typing import Any, cast
 
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
@@ -26,11 +27,11 @@ class Graph:
     def __init__(
         self,
         config: GraphConfig,
-        logger_config: LoggerConfig = None,
-        logger: logging.Logger = None,
-        llm_config: LLMConfig = None,
-        work_config: WorkConfig = None,
-        tool_config: ToolConfig = None,
+        logger_config: LoggerConfig | None = None,
+        logger: logging.Logger | None = None,
+        llm_config: LLMConfig | None = None,
+        work_config: WorkConfig | None = None,
+        tool_config: ToolConfig | None = None,
     ):
         assert logger_config is not None or logger is not None, "Either logger_config or logger must be provided"
         if logger_config is not None:
@@ -47,9 +48,14 @@ class Graph:
         self.tool_config = tool_config
 
     def create_graph(self, tools=None, checkpointer=None, need_memory=False):
+        assert self.llm_config is not None
+        assert self.work_config is not None
+        assert self.tool_config is not None
+
         if checkpointer is None:
             checkpointer = InMemorySaver() if need_memory else None
 
+        tools = tools or []
         tool_node = get_custom_tool_node(tools=tools, logger=self.logger)
         chatbot_node = get_chatbot_node(
             config=self.llm_config,
@@ -67,7 +73,7 @@ class Graph:
             logger=self.logger,
         )
 
-        builder = StateGraph(State)
+        builder = StateGraph(cast(Any, State))
         builder.add_node("my_tools", tool_node)
         builder.add_node("chatbot", chatbot_node)
         builder.add_node("human_confirm", human_confirm_node)

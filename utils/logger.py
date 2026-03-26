@@ -7,7 +7,7 @@ from typing import Optional
 from config.config_class import LoggerConfig
 
 
-def get_logger(name="unnamed", log_dir: str = None) -> logging.Logger:
+def get_logger(name="unnamed", log_dir: str | None = None) -> logging.Logger:
     logger = logging.getLogger(name)
     logger.propagate = False
     logger.setLevel(logging.DEBUG)

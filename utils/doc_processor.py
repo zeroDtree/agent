@@ -7,7 +7,7 @@ import json
 import re
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 import markdown
 import yaml
@@ -515,7 +515,7 @@ class CodeProcessor(DocumentProcessor):
                     in_function = True
                     function_lines = 0
                 elif in_function:
-                    if stripped and not line[0] in (" ", "\t"):
+                    if stripped and line[0] not in (" ", "\t"):
                         if function_lines > 50:
                             complexity["long_functions"] += 1
                         in_function = False
@@ -589,5 +589,5 @@ def get_supported_extensions() -> Set[str]:
     extensions: Set[str] = set()
     for processor in factory._processors:
         if hasattr(processor, "SUPPORTED_EXTENSIONS"):
-            extensions.update(processor.SUPPORTED_EXTENSIONS)
+            extensions.update(cast(Iterable[str], processor.SUPPORTED_EXTENSIONS))
     return extensions

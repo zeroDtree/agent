@@ -45,7 +45,7 @@ def load_config_from_json(name: str) -> EKBConfig:
 
     except Exception as e:
         print(f"❌ Failed to load configuration for '{name}': {e}")
-        print(f"⚠️  Using minimal config instead")
+        print("⚠️  Using minimal config instead")
         return EKBConfig(name=name, source_paths=None)
 
 

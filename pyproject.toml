@@ -23,6 +23,8 @@ dependencies = [
 	"hydra-core",
 	"omegaconf",
 	"gnureadline>=8.3.3",
+	"ruff",
+	"ty"
 ]
 
 [dependency-groups]

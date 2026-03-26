@@ -7,7 +7,7 @@ from graphs.state import State
 from graphs.utils import extract_text_from_content_blocks
 
 
-def get_custom_tool_node(tools=None, logger: logging.Logger = None):
+def get_custom_tool_node(tools=None, logger: logging.Logger | None = None):
     """
     Create a custom tool node that executes tools and converts MCP tool response
     content from list format to string format for LLM compatibility.

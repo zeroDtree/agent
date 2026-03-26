@@ -326,7 +326,7 @@ def add_dict_observer(dict_name: str, callback: Callable[[str, str, Any, Any], N
     dict_manager.add_observer(dict_name, callback)
 
 
-def get_dict_history(dict_name: str = None, limit: int = 100) -> List[Dict]:
+def get_dict_history(dict_name: str | None = None, limit: int = 100) -> List[Dict]:
     """
     Get dictionary modification history
 

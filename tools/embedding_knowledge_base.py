@@ -98,6 +98,7 @@ def search_knowledge_base(query: str, name: str = "default", limit: int = 5) -> 
     kb, err = _require_kb(name)
     if err:
         return f"❌ {err}"
+    assert kb is not None
 
     try:
         results = kb.search(query, k=limit)
@@ -138,6 +139,7 @@ def add_text_to_knowledge_base(name: str, texts: str, titles: str = "") -> str:
     kb, err = _require_kb(name)
     if err:
         return f"❌ {err}"
+    assert kb is not None
 
     try:
         text_list = [t.strip() for t in texts.split("|") if t.strip()]
@@ -166,6 +168,7 @@ def get_knowledge_base_stats(name: str = "default") -> str:
     kb, err = _require_kb(name)
     if err:
         return f"❌ {err}"
+    assert kb is not None
 
     try:
         stats = kb.get_stats()
@@ -238,6 +241,7 @@ def get_database_debug_info(name: str = "default") -> str:
     kb, err = _require_kb(name)
     if err:
         return f"❌ {err}"
+    assert kb is not None
 
     try:
         info = kb.get_database_info()
@@ -273,6 +277,7 @@ def switch_database_backend(name: str = "default", db_type: str = "chroma", debu
     kb, err = _require_kb(name)
     if err:
         return f"❌ {err}"
+    assert kb is not None
 
     try:
         if kb.switch_database_backend(db_type, debug_mode):

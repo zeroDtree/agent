@@ -1,6 +1,6 @@
-from .shell import get_run_shell_command_popen_tool  # type: ignore
-from .todo_list import get_todo_list_tool  # type: ignore
-from .embedding_knowledge_base import search_knowledge_base  # type: ignore
+from .shell import get_run_shell_command_popen_tool
+from .todo_list import get_todo_list_tool
+from .embedding_knowledge_base import search_knowledge_base
 
 from config.config_class import WorkConfig
 

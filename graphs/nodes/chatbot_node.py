@@ -6,7 +6,7 @@ from graphs.llm import get_llm_with_tools
 from graphs.state import State
 
 
-def get_chatbot_node(config: LLMConfig, tools: list[Tool] = None, max_history: int = 10000):
+def get_chatbot_node(config: LLMConfig, tools: list[Tool] | None = None, max_history: int = 10000):
 
     async def chatbot(state: State):
         messages = _cleanup_old_messages(state["messages"], max_history=max_history)

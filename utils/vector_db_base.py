@@ -4,13 +4,15 @@ Public interfaces and factory — import from here in application code.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Callable, cast
 
 from langchain_core.documents import Document
 
 
 class VectorDatabaseInterface(ABC):
     """Abstract interface for vector database backends."""
+
+    _lazy_embedding_getter: Callable[[], Any] | None = None
 
     @abstractmethod
     def create_from_documents(self, documents: list[Document]) -> bool:
@@ -76,7 +78,8 @@ class VectorDatabaseFactory:
         if key not in registry:
             raise ValueError(f"Unsupported database type: '{db_type}'. Available: {list(registry)}")
 
-        return registry[key](
+        ctor = cast(Callable[..., VectorDatabaseInterface], registry[key])
+        return ctor(
             persist_directory=persist_directory,
             embedding_function=embedding_function,
             name=name,

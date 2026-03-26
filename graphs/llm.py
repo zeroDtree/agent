@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 from langchain_core.tools import Tool
 from langchain_openai import ChatOpenAI
 
@@ -5,7 +7,7 @@ from config.config_class import LLMConfig
 
 
 def get_llm_model(config: LLMConfig) -> ChatOpenAI:
-    return ChatOpenAI(
+    return cast(Any, ChatOpenAI)(
         api_key=config.api_key,
         base_url=config.base_url,
         model=config.model_name,
@@ -17,6 +19,6 @@ def get_llm_model(config: LLMConfig) -> ChatOpenAI:
     )
 
 
-def get_llm_with_tools(config: LLMConfig, tools: list[Tool]):
+def get_llm_with_tools(config: LLMConfig, tools: list[Tool] | None = None):
     llm = get_llm_model(config=config)
     return llm.bind_tools(tools) if tools else llm

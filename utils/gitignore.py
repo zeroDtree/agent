@@ -1,6 +1,6 @@
 import subprocess
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 
 class GitIgnoreChecker:
@@ -125,7 +125,7 @@ class GitIgnoreChecker:
             print(f"Git check-ignore batch failed: {e}")
             return {str(path): False for path in file_paths}
 
-    def get_ignore_info(self, file_path: Path, source_root: Optional[Path] = None) -> Optional[Dict[str, str]]:
+    def get_ignore_info(self, file_path: Path, source_root: Optional[Path] = None) -> Optional[Dict[str, Any]]:
         """Get detailed ignore information including which pattern matched"""
         if not self._git_available:
             return None

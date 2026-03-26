@@ -84,8 +84,10 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
         if not self._ensure_vectorstore():
             return False
 
+        vs = self._vectorstore
+        assert vs is not None
         try:
-            self._vectorstore.add_documents(documents)
+            vs.add_documents(documents)
             logger.info(f"[{self.name}] Added {len(documents)} documents.")
             return True
         except Exception as exc:
@@ -96,8 +98,10 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
         if not self._ensure_vectorstore():
             return False
 
+        vs = self._vectorstore
+        assert vs is not None
         try:
-            self._vectorstore._collection.delete(where=filter_criteria)
+            vs._collection.delete(where=filter_criteria)
             logger.info(f"[{self.name}] Deleted documents matching: {filter_criteria}")
             return True
         except Exception as exc:
@@ -113,11 +117,12 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
         if not self._ensure_vectorstore():
             return []
 
+        vs = self._vectorstore
+        assert vs is not None
         try:
-            kwargs = {"k": k}
             if filter_metadata:
-                kwargs["filter"] = filter_metadata
-            return self._vectorstore.similarity_search_with_score(query, **kwargs)
+                return vs.similarity_search_with_score(query, k=k, filter=filter_metadata)
+            return vs.similarity_search_with_score(query, k=k)
         except Exception as exc:
             logger.error(f"[{self.name}] Search failed: {exc}")
             return []
@@ -253,9 +258,11 @@ class ChromaVectorDatabase(VectorDatabaseInterface):
 
         # Last resort: load the full vectorstore.
         if self._resolve_embedding() and self._ensure_vectorstore():
-            try:
-                return self._vectorstore._collection.count()
-            except Exception as exc:
-                return f"Error: {exc}"
+            vs = self._vectorstore
+            if vs is not None:
+                try:
+                    return vs._collection.count()
+                except Exception as exc:
+                    return f"Error: {exc}"
 
         return "Not initialized (no embedding function)"

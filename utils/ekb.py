@@ -288,7 +288,9 @@ class EmbeddingKnowledgeBase:
         extensions: set[str] = set()
         for processor in self.processors:
             if hasattr(processor, "supported_extensions"):
-                extensions.update(processor.supported_extensions())
+                se = getattr(processor, "supported_extensions")
+                if callable(se):
+                    extensions.update(se())
         extensions.update([".md", ".markdown", ".txt", ".text", ".json"])
         return list(extensions)
 
