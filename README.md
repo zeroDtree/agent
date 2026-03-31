@@ -8,11 +8,12 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
   - [1. Table of Contents](#1-table-of-contents)
   - [2. What This Project Provides](#2-what-this-project-provides)
   - [3. Quick Start](#3-quick-start)
-    - [3.1. Prerequisites](#31-prerequisites)
-    - [3.2. Clone and Initialize](#32-clone-and-initialize)
-    - [3.3. Run on Host](#33-run-on-host)
-    - [3.4. Run in Docker](#34-run-in-docker)
-    - [3.5. Common Startup Overrides](#35-common-startup-overrides)
+    - [3.1. Environment Variables](#31-environment-variables)
+    - [3.2. Prerequisites](#32-prerequisites)
+    - [3.3. Clone and Initialize](#33-clone-and-initialize)
+    - [3.4. Run on Host](#34-run-on-host)
+    - [3.5. Run in Docker](#35-run-in-docker)
+    - [3.6. Common Startup Overrides](#36-common-startup-overrides)
   - [4. Configuration](#4-configuration)
     - [4.1. Hydra Config Map](#41-hydra-config-map)
     - [4.2. MCP Runtime Model](#42-mcp-runtime-model)
@@ -35,12 +36,48 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
 
 ## 3. Quick Start
 
-### 3.1. Prerequisites
+### 3.1. Environment Variables
+
+Set these variables before starting the agent.
+
+Required for LLM requests:
+
+| Variable          | Required | Description                                                                             |
+| ----------------- | -------- | --------------------------------------------------------------------------------------- |
+| `OPENAI_API_KEY`  | Yes      | API key used by `config/llm/deepseek.yaml`.                                             |
+| `OPENAI_API_BASE` | Yes      | Base URL used by `config/llm/deepseek.yaml` (for example DeepSeek-compatible endpoint). |
+
+Optional runtime variable:
+
+| Variable     | Required | Description                                                                                           |
+| ------------ | -------- | ----------------------------------------------------------------------------------------------------- |
+| `UV_PROJECT` | No       | Path passed to `uv run --project` in startup scripts. If unset, scripts use the default project path. |
+
+Optional variables for the `knowledge_graph` MCP server (Neo4j):
+
+| Variable                      | Default                 | Description                             |
+| ----------------------------- | ----------------------- | --------------------------------------- |
+| `NEO4J_URI`                   | `bolt://localhost:7687` | Neo4j connection URI.                   |
+| `NEO4J_USER`                  | `neo4j`                 | Neo4j username.                         |
+| `NEO4J_PASSWORD`              | `password`              | Neo4j password.                         |
+| `NEO4J_DATABASE`              | `neo4j`                 | Neo4j database name.                    |
+| `NEO4J_QUERY_TIMEOUT_SECONDS` | `6`                     | Query timeout in seconds.               |
+| `KG_DEFAULT_LIMIT`            | `20`                    | Default result limit for graph queries. |
+| `KG_MAX_LIMIT`                | `100`                   | Upper bound for graph query results.    |
+
+Example:
+
+```bash
+export OPENAI_API_KEY="your_api_key"
+export OPENAI_API_BASE="https://your-provider.example/v1"
+```
+
+### 3.2. Prerequisites
 
 - Install [uv](https://github.com/astral-sh/uv).
 - Ensure required ports for MCP servers are available (default: `8000`, `8001`, `8002`).
 
-### 3.2. Clone and Initialize
+### 3.3. Clone and Initialize
 
 ```bash
 git clone git@github.com:zeroDtree/agent.git
@@ -50,7 +87,7 @@ git submodule update --init --recursive
 
 The `mcp` submodule contains MCP server implementations used by the startup scripts.
 
-### 3.3. Run on Host
+### 3.4. Run on Host
 
 ```bash
 bash shell_scripts/start.sh [hydra overrides...]
@@ -58,7 +95,7 @@ bash shell_scripts/start.sh [hydra overrides...]
 
 This command starts MCP servers defined in `mcp/config.yaml`, waits for ports to become ready, then launches the agent. MCP servers are stopped when the process exits.
 
-### 3.4. Run in Docker
+### 3.5. Run in Docker
 
 ```bash
 bash shell_scripts/build_docker.sh
@@ -70,7 +107,7 @@ The container mounts:
 - Project directory: `/tmp/proj_dir`
 - Writable working directory: `/tmp/work_dir`
 
-### 3.5. Common Startup Overrides
+### 3.6. Common Startup Overrides
 
 Use Hydra override syntax to customize runtime behavior at launch:
 
