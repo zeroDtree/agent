@@ -78,6 +78,7 @@ stop_all() {
     echo "Stopping MCP servers..."
     stop_server "math"
     stop_server "code_lint"
+    stop_server "knowledge_graph"
 }
 
 # Handle "stop" sub-command
@@ -148,13 +149,14 @@ wait_for_port() {
 # ---------------------------------------------------------------------------
 start_server "math"      "calculate.py"
 start_server "code_lint" "code_lint.py"
+start_server "knowledge_graph" "knowledge_graph.py"
 
 # ---------------------------------------------------------------------------
 # Optionally wait for all HTTP servers to be healthy
 # ---------------------------------------------------------------------------
 if [ "${1:-}" = "--wait" ]; then
     echo "Waiting for MCP servers to be ready..."
-    for entry in math:8000 code_lint:8001; do
+    for entry in math:8000 code_lint:8001 knowledge_graph:8002; do
         name="${entry%%:*}"
         port="${entry##*:}"
 

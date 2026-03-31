@@ -1,0 +1,132 @@
+{
+  "id": "coding-default",
+  "name": "Coding Default",
+  "enabled": true,
+  "description": "LoreBook generated from prompts/lorebooks/coding-default",
+  "source_scope": [
+    "global",
+    "character",
+    "persona",
+    "chat"
+  ],
+  "merge_strategy": "global_sorted_merge",
+  "merge_policy": {
+    "mode": "global_sorted_merge",
+    "priority": [
+      "character",
+      "persona",
+      "chat",
+      "global"
+    ]
+  },
+  "budget": {
+    "max_tokens": 2000,
+    "overflow_policy": "drop_low_priority"
+  },
+  "defaults": {
+    "position": "after_char_defs",
+    "probability": 1.0,
+    "case_sensitive": false
+  },
+  "runtime": {
+    "max_recursion_steps": 3,
+    "random_seed_strategy": "session_stable",
+    "log_level": "normal"
+  },
+  "entries": [
+    {
+      "id": "english-code-generate",
+      "path": "entries/english-code-generate.md",
+      "enabled": true,
+      "content": "Write generated source code, identifiers, comments, docstrings, and developer-facing output in English.\nPrefer clear and simple wording, keep naming consistent, and preserve semantic intent from non-English input.",
+      "resolved": {
+        "triggers": {
+          "keywords": [
+            "code",
+            "function",
+            "class",
+            "script",
+            "refactor",
+            "implement"
+          ],
+          "regex": [],
+          "case_sensitive": false,
+          "whole_word": false
+        },
+        "filters": {
+          "role_allowlist": [
+            "assistant"
+          ],
+          "role_denylist": []
+        },
+        "injection": {
+          "position": "after_char_defs",
+          "order": 90,
+          "message_type": null,
+          "outlet": null,
+          "depth": null
+        },
+        "advanced": {
+          "inclusion_group": null,
+          "group_scoring": false,
+          "probability": 1.0,
+          "recursive": false,
+          "max_recursion_depth": 0,
+          "sticky_turns": 0,
+          "cooldown_turns": 0,
+          "delay_turns": 0
+        },
+        "budget": {
+          "max_tokens": 300,
+          "truncate": "tail"
+        }
+      }
+    },
+    {
+      "id": "python-env-rule",
+      "path": "entries/python-env-rule.md",
+      "enabled": true,
+      "content": "Always use one of the following when running Python commands or scripts:\n\n- Prefix commands with `uv run`: `uv run python script.py`, `uv run pytest`.\n- Or activate the virtual environment first: `source .venv/bin/activate`.\n\nPrefer `uv run` for one-off commands and activate the environment for interactive sessions.",
+      "resolved": {
+        "triggers": {
+          "keywords": [
+            "python",
+            "pytest",
+            "script",
+            "uv run"
+          ],
+          "regex": [],
+          "case_sensitive": false,
+          "whole_word": false
+        },
+        "filters": {
+          "role_allowlist": [
+            "assistant"
+          ],
+          "role_denylist": []
+        },
+        "injection": {
+          "position": "after_char_defs",
+          "order": 100,
+          "message_type": null,
+          "outlet": null,
+          "depth": null
+        },
+        "advanced": {
+          "inclusion_group": null,
+          "group_scoring": false,
+          "probability": 1.0,
+          "recursive": false,
+          "max_recursion_depth": 0,
+          "sticky_turns": 0,
+          "cooldown_turns": 0,
+          "delay_turns": 0
+        },
+        "budget": {
+          "max_tokens": 300,
+          "truncate": "tail"
+        }
+      }
+    }
+  ]
+}

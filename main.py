@@ -16,7 +16,7 @@ from config.config_class import AutoMode, GraphConfig, LLMConfig, ToolConfig, Wo
 from graphs.graph import Graph
 from tools import get_all_tools
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
-from utils.preset import preset_messages
+from utils.preset import build_preset_messages
 
 # ---------------------------------------------------------------------------
 # Config builders
@@ -128,6 +128,7 @@ async def chat_loop(graph, cfg, logger, tools: list):
 
     is_first = True
     conversation_history: list = []
+    turn_index = 0
 
     print("Welcome to MyCodex CLI!")
     print(f"Using model: {cfg.llm.model_name}")
@@ -233,7 +234,17 @@ async def chat_loop(graph, cfg, logger, tools: list):
                             print(f"Tool call failed: {e}")
                 continue
 
-            messages = (preset_messages if is_first else []) + conversation_history + [HumanMessage(content=user_input)]
+            turn_index += 1
+            char_cfg = cfg.get("char")
+            lorebook_ids = list(char_cfg.get("lorebook_ids", [])) if char_cfg else []
+            preset_messages = build_preset_messages(
+                user_input=user_input,
+                thread_id=str(cfg.system.thread_id),
+                turn_index=turn_index,
+                lorebook_ids=lorebook_ids,
+                include_base_messages=is_first,
+            )
+            messages = preset_messages + conversation_history + [HumanMessage(content=user_input)]
             is_first = False
 
             streaming_printed_tool_keys: set = set()

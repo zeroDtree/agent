@@ -26,9 +26,15 @@ dependencies = [
 	"ruff",
 	"ty",
 	"prompt-toolkit>=3.0.52",
+	"neo4j",
+	"jsonschema>=4.23.0",
 ]
 
 [dependency-groups]
 lint = ["black", "pylint", "autoflake"]
 ekb = ["sentence-transformers"]
-dev = [{ include-group = "lint" }, { include-group = "ekb" }]
+dev = ["pytest", { include-group = "lint" }, { include-group = "ekb" }]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["test"]

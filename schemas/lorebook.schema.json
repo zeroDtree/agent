@@ -1,0 +1,220 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/schemas/lorebook.schema.json",
+  "title": "LoreBook Schema",
+  "type": "object",
+  "required": ["id", "name", "enabled", "merge_strategy", "budget", "defaults", "entries"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "enabled": { "type": "boolean" },
+    "description": { "type": "string" },
+    "source_scope": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["global", "character", "persona", "chat"] },
+      "uniqueItems": true
+    },
+    "merge_strategy": { "type": "string", "enum": ["global_sorted_merge", "character_first"] },
+    "merge_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["global_sorted_merge", "character_first"] },
+        "priority": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["global", "character", "persona", "chat"] },
+          "uniqueItems": true
+        }
+      },
+      "required": ["mode", "priority"]
+    },
+    "budget": {
+      "type": "object",
+      "required": ["max_tokens", "overflow_policy"],
+      "additionalProperties": false,
+      "properties": {
+        "max_tokens": { "type": "integer", "minimum": 1 },
+        "overflow_policy": { "type": "string", "enum": ["drop_low_priority", "truncate_tail", "truncate_head"] }
+      }
+    },
+    "defaults": {
+      "type": "object",
+      "required": ["position", "probability", "case_sensitive"],
+      "additionalProperties": false,
+      "properties": {
+        "position": {
+          "type": "string",
+          "enum": [
+            "before_char_defs",
+            "after_char_defs",
+            "depth",
+            "message",
+            "outlet"
+          ]
+        },
+        "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "case_sensitive": { "type": "boolean" }
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "max_recursion_steps": { "type": "integer", "minimum": 0 },
+        "random_seed_strategy": { "type": "string", "enum": ["session_stable", "request_random"] },
+        "log_level": { "type": "string", "enum": ["off", "normal", "debug"] },
+        "injection_order": {
+          "type": "string",
+          "enum": ["small_first", "great_first"],
+          "description": "Sort entries by injection.order ascending (small_first) or descending (great_first)."
+        }
+      },
+      "required": ["max_recursion_steps", "random_seed_strategy", "log_level"]
+    },
+    "entries": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/entry" },
+      "minItems": 1
+    }
+  },
+  "$defs": {
+    "triggers": {
+      "type": "object",
+      "required": ["keywords", "regex", "case_sensitive", "whole_word"],
+      "additionalProperties": false,
+      "properties": {
+        "keywords": { "type": "array", "items": { "type": "string" } },
+        "regex": { "type": "array", "items": { "type": "string" } },
+        "case_sensitive": { "type": "boolean" },
+        "whole_word": { "type": "boolean" }
+      }
+    },
+    "filters": {
+      "type": "object",
+      "required": ["role_allowlist", "role_denylist"],
+      "additionalProperties": false,
+      "properties": {
+        "role_allowlist": { "type": "array", "items": { "type": "string" } },
+        "role_denylist": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "injection": {
+      "allOf": [
+        {
+          "type": "object",
+          "required": ["position", "order", "message_type", "outlet", "depth"],
+          "additionalProperties": false,
+          "properties": {
+            "position": {
+              "type": "string",
+              "enum": [
+                "before_char_defs",
+                "after_char_defs",
+                "depth",
+                "message",
+                "outlet"
+              ]
+            },
+            "order": { "type": "integer" },
+            "message_type": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "string", "enum": ["system", "user", "assistant"] }
+              ]
+            },
+            "outlet": { "type": ["string", "null"] },
+            "depth": {
+              "oneOf": [
+                { "type": "null" },
+                { "type": "integer", "minimum": 0 }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "position": { "const": "depth" } },
+            "required": ["position"]
+          },
+          "then": {
+            "properties": {
+              "depth": { "type": "integer", "minimum": 0 }
+            },
+            "required": ["depth"]
+          },
+          "else": {
+            "properties": {
+              "depth": { "type": "null" }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "position": { "const": "message" } },
+            "required": ["position"]
+          },
+          "then": {
+            "properties": {
+              "message_type": { "type": "string", "enum": ["system", "user", "assistant"] }
+            },
+            "required": ["message_type"]
+          },
+          "else": {
+            "properties": {
+              "message_type": { "type": "null" }
+            }
+          }
+        }
+      ]
+    },
+    "advanced": {
+      "type": "object",
+      "required": ["inclusion_group", "group_scoring", "probability", "recursive", "max_recursion_depth", "sticky_turns", "cooldown_turns", "delay_turns"],
+      "additionalProperties": false,
+      "properties": {
+        "inclusion_group": { "type": ["string", "null"] },
+        "group_scoring": { "type": "boolean" },
+        "probability": { "type": "number", "minimum": 0, "maximum": 1 },
+        "recursive": { "type": "boolean" },
+        "max_recursion_depth": { "type": "integer", "minimum": 0 },
+        "sticky_turns": { "type": "integer", "minimum": 0 },
+        "cooldown_turns": { "type": "integer", "minimum": 0 },
+        "delay_turns": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "entryBudget": {
+      "type": "object",
+      "required": ["max_tokens", "truncate"],
+      "additionalProperties": false,
+      "properties": {
+        "max_tokens": { "type": "integer", "minimum": 1 },
+        "truncate": { "type": "string", "enum": ["head", "tail", "none"] }
+      }
+    },
+    "resolved": {
+      "type": "object",
+      "required": ["triggers", "filters", "injection", "advanced", "budget"],
+      "additionalProperties": false,
+      "properties": {
+        "triggers": { "$ref": "#/$defs/triggers" },
+        "filters": { "$ref": "#/$defs/filters" },
+        "injection": { "$ref": "#/$defs/injection" },
+        "advanced": { "$ref": "#/$defs/advanced" },
+        "budget": { "$ref": "#/$defs/entryBudget" }
+      }
+    },
+    "entry": {
+      "type": "object",
+      "required": ["id", "path", "enabled", "content", "resolved"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$" },
+        "path": { "type": "string", "pattern": "^entries/.+\\.md$" },
+        "enabled": { "type": "boolean" },
+        "content": { "type": "string", "minLength": 1 },
+        "resolved": { "$ref": "#/$defs/resolved" }
+      }
+    }
+  }
+}
