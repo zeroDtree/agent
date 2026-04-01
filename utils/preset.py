@@ -26,16 +26,28 @@ def _read_first_existing(paths: list[str]) -> str:
     raise FileNotFoundError(f"None of the prompt files exist: {paths}")
 
 
-BASE_PRESET_MESSAGES = [
-    SystemMessage(content=_read_text("prompts/core/system.md")),
-    AIMessage(content=_read_first_existing(["prompts/core/ai-ok1.md", "prompts/core/ai-ok.md"])),
-    HumanMessage(
-        content=_read_text("prompts/core/role_play.md")
-        + "\n\n"
-        + _read_first_existing(["prompts/chars/main.md", "prompts/default/main.md"])
-    ),
-    AIMessage(content=_read_text("prompts/core/ai-ok2.md")),
-]
+_DEFAULT_CHARACTER_PROMPT_PATHS = ["prompts/chars/main.md", "prompts/default/main.md"]
+
+
+def _read_character_prompt(character_prompt_path: str | None = None) -> str:
+    if character_prompt_path:
+        candidate = _PROJECT_ROOT / character_prompt_path
+        if not candidate.exists():
+            raise FileNotFoundError(f"Character prompt file not found: {character_prompt_path}")
+        return candidate.read_text(encoding="utf-8")
+    return _read_first_existing(_DEFAULT_CHARACTER_PROMPT_PATHS)
+
+
+def _build_base_preset_messages(character_prompt_path: str | None = None) -> list:
+    return [
+        SystemMessage(content=_read_text("prompts/core/system.md")),
+        AIMessage(content=_read_first_existing(["prompts/core/ai-ok1.md", "prompts/core/ai-ok.md"])),
+        HumanMessage(content=_read_text("prompts/core/role_play.md") + "\n\n" + _read_character_prompt(character_prompt_path)),
+        AIMessage(content=_read_text("prompts/core/ai-ok2.md")),
+    ]
+
+
+BASE_PRESET_MESSAGES = _build_base_preset_messages()
 
 _DEFAULT_LOREBOOK_ID = "coding-default"
 _LOREBOOK_ROOT = _PROJECT_ROOT / "prompts/lorebooks"
@@ -77,6 +89,7 @@ def build_preset_messages(
     lorebook_ids: list[str] | None = None,
     tags: set[str] | None = None,
     include_base_messages: bool = True,
+    character_prompt_path: str | None = None,
 ) -> list:
     runtime_context = RuntimeContext(
         request_id=str(uuid4()),
@@ -95,5 +108,5 @@ def build_preset_messages(
     if runtime_result.injected_prompt:
         messages.append(SystemMessage(content=runtime_result.injected_prompt))
     if include_base_messages:
-        messages.extend(BASE_PRESET_MESSAGES)
+        messages.extend(_build_base_preset_messages(character_prompt_path))
     return messages

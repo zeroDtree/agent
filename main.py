@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+from pathlib import Path
 
 import gnureadline  # noqa: F401
 import hydra
@@ -17,6 +18,8 @@ from graphs.graph import Graph
 from tools import get_all_tools
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
 from utils.preset import build_preset_messages
+
+_PROJECT_ROOT = Path(__file__).resolve().parent
 
 # ---------------------------------------------------------------------------
 # Config builders
@@ -115,6 +118,20 @@ def _graph_run_config(cfg: DictConfig) -> dict:
     }
 
 
+def _resolve_prompt_dir(prompt_dir: str) -> Path:
+    return (_PROJECT_ROOT / prompt_dir).resolve()
+
+
+def _list_available_roles(prompt_dir: Path) -> list[str]:
+    if not prompt_dir.exists() or not prompt_dir.is_dir():
+        return []
+    return sorted(path.stem for path in prompt_dir.glob("*.md"))
+
+
+def _resolve_role_prompt_path(prompt_dir: Path, role_name: str) -> str:
+    return str((prompt_dir / f"{role_name}.md").relative_to(_PROJECT_ROOT))
+
+
 # ---------------------------------------------------------------------------
 # Main chat loop
 # ---------------------------------------------------------------------------
@@ -129,6 +146,19 @@ async def chat_loop(graph, cfg, logger, tools: list):
     is_first = True
     conversation_history: list = []
     turn_index = 0
+    char_cfg = cfg.get("char")
+    lorebook_ids = list(char_cfg.get("lorebook_ids", [])) if char_cfg else []
+    prompt_dir = _resolve_prompt_dir(str(char_cfg.get("prompt_dir", "prompts/chars")) if char_cfg else "prompts/chars")
+    current_role = str(char_cfg.get("active", "main")) if char_cfg else "main"
+
+    available_roles = _list_available_roles(prompt_dir)
+    if current_role not in available_roles and available_roles:
+        print(f"Configured role '{current_role}' not found. Falling back to '{available_roles[0]}'.")
+        current_role = available_roles[0]
+    elif not available_roles:
+        print(f"No role prompts found in {prompt_dir}. Falling back to default prompt behavior.")
+
+    current_prompt_path = _resolve_role_prompt_path(prompt_dir, current_role) if available_roles else None
 
     print("Welcome to MyCodex CLI!")
     print(f"Using model: {cfg.llm.model_name}")
@@ -152,12 +182,48 @@ async def chat_loop(graph, cfg, logger, tools: list):
                     "Commands:\n"
                     "  !tool list                   - list available tools\n"
                     "  !tool <name> [json_args]     - call a tool directly\n"
+                    "  !char list                   - list available character roles\n"
+                    "  !char show                   - show active role\n"
+                    "  !char set <role>             - switch active role for next turns\n"
                     "  !save <filename>             - save conversation to file\n"
                     "  !load <filename>             - load conversation from file\n"
                     "  !clear                       - clear conversation history\n"
                     "  !history                     - show conversation history\n"
                     "  exit / quit                  - exit CLI\n"
                 )
+                continue
+
+            if user_input.startswith("!char"):
+                parts = user_input.split(maxsplit=2)
+                sub = parts[1] if len(parts) > 1 else "show"
+                available_roles = _list_available_roles(prompt_dir)
+
+                if sub == "list":
+                    if not available_roles:
+                        print(f"(no role prompts found in {prompt_dir})")
+                    else:
+                        print("Available roles:")
+                        for role in available_roles:
+                            marker = " (active)" if role == current_role else ""
+                            print(f"  {role}{marker}")
+                elif sub == "show":
+                    print(f"Active role: {current_role}")
+                    if current_prompt_path:
+                        print(f"Prompt file: {current_prompt_path}")
+                elif sub == "set":
+                    if len(parts) < 3:
+                        print("Usage: !char set <role>")
+                    else:
+                        target_role = parts[2].strip()
+                        if target_role not in available_roles:
+                            print(f"Unknown role: {target_role}. Use '!char list' to see available roles.")
+                        else:
+                            current_role = target_role
+                            current_prompt_path = _resolve_role_prompt_path(prompt_dir, current_role)
+                            is_first = True
+                            print(f"Active role switched to: {current_role}")
+                else:
+                    print("Unknown !char command. Use !char list | !char show | !char set <role>.")
                 continue
 
             if user_input.startswith("!save"):
@@ -235,14 +301,13 @@ async def chat_loop(graph, cfg, logger, tools: list):
                 continue
 
             turn_index += 1
-            char_cfg = cfg.get("char")
-            lorebook_ids = list(char_cfg.get("lorebook_ids", [])) if char_cfg else []
             preset_messages = build_preset_messages(
                 user_input=user_input,
                 thread_id=str(cfg.system.thread_id),
                 turn_index=turn_index,
                 lorebook_ids=lorebook_ids,
                 include_base_messages=is_first,
+                character_prompt_path=current_prompt_path,
             )
             messages = preset_messages + conversation_history + [HumanMessage(content=user_input)]
             is_first = False

@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
 
 import utils.preset as preset_module
 from utils.preset import BASE_PRESET_MESSAGES, build_preset_messages
@@ -112,3 +112,35 @@ def test_build_preset_messages_loads_multiple_lorebooks(monkeypatch, tmp_path: P
     assert "B content" in text
     assert "A content" in text
     assert text.index("B content") < text.index("A content")
+
+
+def test_build_preset_messages_uses_custom_character_prompt_path(tmp_path: Path) -> None:
+    custom_prompt = tmp_path / "custom_role.md"
+    custom_prompt.write_text("<character-information>\ncustom-role\n</character-information>", encoding="utf-8")
+
+    messages = build_preset_messages(
+        user_input="no-match-for-lorebook",
+        thread_id="session-custom-role",
+        turn_index=1,
+        include_base_messages=True,
+        character_prompt_path=str(custom_prompt),
+    )
+
+    human_messages = [msg for msg in messages if isinstance(msg, HumanMessage)]
+    assert len(human_messages) == 1
+    assert "custom-role" in str(human_messages[0].content)
+
+
+def test_build_preset_messages_raises_for_missing_character_prompt() -> None:
+    try:
+        build_preset_messages(
+            user_input="no-match-for-lorebook",
+            thread_id="session-missing-role",
+            turn_index=1,
+            include_base_messages=True,
+            character_prompt_path="prompts/chars/does-not-exist.md",
+        )
+    except FileNotFoundError as exc:
+        assert "does-not-exist.md" in str(exc)
+    else:
+        raise AssertionError("Expected FileNotFoundError for missing character prompt file")

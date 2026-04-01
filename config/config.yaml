@@ -4,6 +4,7 @@ defaults:
   - work: default
   - llm: deepseek
   - ekb: default
+  - char: default
   - tool: default
   - mcp: default
   - _self_

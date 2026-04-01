@@ -1,0 +1,4 @@
+active: "main"
+prompt_dir: "prompts/chars"
+lorebook_ids:
+  - "coding-default"
