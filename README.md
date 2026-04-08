@@ -1,6 +1,6 @@
 # Agent
 
-A LangGraph-based agent runtime with MCP integration, shell tooling, configurable tool approval modes, optional embedding-based retrieval, and a prompt manager (lorebook build/runtime plus preset assembly for the chat loop).
+A LangGraph-based agent runtime with MCP integration, shell tooling, configurable tool approval modes, optional embedding-based retrieval, and a prompt manager.
 
 ## 1. Table of Contents
 
@@ -14,6 +14,7 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
     - [3.4. Run on Host](#34-run-on-host)
     - [3.5. Run in Docker](#35-run-in-docker)
     - [3.6. Common Startup Overrides](#36-common-startup-overrides)
+    - [3.7. Interactive CLI commands](#37-interactive-cli-commands)
   - [4. Configuration](#4-configuration)
     - [4.1. Hydra Config Map](#41-hydra-config-map)
     - [4.2. MCP Runtime Model](#42-mcp-runtime-model)
@@ -117,6 +118,25 @@ bash shell_scripts/start.sh \
   ++work.auto_mode=whitelist_accept \
   ++work.working_directory=/tmp/work_dir
 ```
+
+### 3.7. Interactive CLI commands
+
+After `bash shell_scripts/start.sh` (or `bash shell_scripts/start.docker.sh` in Docker), the CLI prompt accepts the following. Any other line is sent to the model as a normal user turn; each turn may print lorebook entries that matched for that message.
+
+| Command                    | Description                                                                                                                                                            |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `exit` / `quit`            | Exit the CLI.                                                                                                                                                          |
+| `!help`                    | Print this command summary.                                                                                                                                            |
+| `!tool list`               | List available tools (local plus MCP).                                                                                                                                 |
+| `!tool <name> [json_args]` | Invoke a tool with JSON arguments (defaults to `{}` if omitted).                                                                                                       |
+| `!char list`               | List character roles from the configured role prompt directory (`char.prompt_dir`, default `prompts/chars`).                                                           |
+| `!char show`               | Show the active role and its prompt file path.                                                                                                                         |
+| `!char set <role>`         | Switch the active role for subsequent turns.                                                                                                                           |
+| `!save <filename>`         | Save the conversation to JSON. Bare filenames are resolved under `conversation_dir` from chat config; absolute paths or paths with a parent segment are used as given. |
+| `!load <filename>`         | Load conversation JSON from disk (same path rules as `!save`).                                                                                                         |
+| `!preset`                  | Print the last assembled preset messages sent to the model (before the latest user message).                                                                           |
+| `!clear`                   | Clear in-memory conversation history.                                                                                                                                  |
+| `!history`                 | Print conversation history (each message truncated to 120 characters).                                                                                                 |
 
 ## 4. Configuration
 
