@@ -1,6 +1,6 @@
 # Agent
 
-A LangGraph-based agent runtime with MCP integration, shell tooling, configurable tool approval modes, and optional embedding-based retrieval.
+A LangGraph-based agent runtime with MCP integration, shell tooling, configurable tool approval modes, optional embedding-based retrieval, and a prompt manager (lorebook build/runtime plus preset assembly for the chat loop).
 
 ## 1. Table of Contents
 
@@ -31,6 +31,7 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
 - **MCP tool federation**: Loads tools from configured MCP servers; unavailable servers are skipped.
 - **Shell command tool**: Executes commands with configurable timeout and working directory.
 - **Embedding Knowledge Base (EKB)**: Supports semantic retrieval over indexed files.
+- **Prompt manager** (`prompt_manager/`): Compiles `prompts/lorebooks/*/entries` to `lorebook.json`, runs trigger-based injection at each turn, and merges results with core/character/persona segments (see `doc/prompt_manager.md`).
 - **Hydra-based configuration**: Hierarchical YAML composition with command-line overrides.
 - **Container support**: Includes Docker scripts for build and startup.
 
@@ -123,15 +124,18 @@ bash shell_scripts/start.sh \
 
 Agent configuration is composed from files under `config/`:
 
-| File                         | Purpose                                  |
-| ---------------------------- | ---------------------------------------- |
-| `config/config.yaml`         | Top-level defaults composition           |
-| `config/llm/deepseek.yaml`   | LLM endpoint, model, sampling parameters |
-| `config/work/default.yaml`   | Working directory, timeout, auto mode    |
-| `config/tool/default.yaml`   | Safe and dangerous tools/commands        |
-| `config/mcp/default.yaml`    | MCP endpoints for tool discovery         |
-| `config/system/default.yaml` | History length, recursion limit, thread  |
-| `config/log/default.yaml`    | Log directory and log level              |
+| File                         | Purpose                                                    |
+| ---------------------------- | ---------------------------------------------------------- |
+| `config/config.yaml`         | Top-level defaults composition                             |
+| `config/llm/deepseek.yaml`   | LLM endpoint, model, sampling parameters                   |
+| `config/work/default.yaml`   | Working directory, timeout, auto mode                      |
+| `config/tool/default.yaml`   | Safe and dangerous tools/commands                          |
+| `config/mcp/default.yaml`    | MCP endpoints for tool discovery                           |
+| `config/system/default.yaml` | History length, recursion limit, thread                    |
+| `config/log/default.yaml`    | Log directory and log level                                |
+| `config/chat/default.yaml`   | Conversation persistence (`conversation_dir`)              |
+| `config/char/default.yaml`   | Character card, lorebook ids, preset segment toggles/order |
+| `config/ekb/default.yaml`    | Vector DB paths, embedding model, chunking, search limits  |
 
 ### 4.2. MCP Runtime Model
 
@@ -188,4 +192,4 @@ No change in `main.py` is required for local tool registration.
 ## 7. Further Documentation
 
 - EKB usage and commands: [doc/embedding_knowledge_base.md](doc/embedding_knowledge_base.md)
-- Prompt manager design: [doc/prompt_manager.md](doc/prompt_manager.md)
+- Prompt manager (pipeline, types, build vs runtime): [doc/prompt_manager.md](doc/prompt_manager.md)
