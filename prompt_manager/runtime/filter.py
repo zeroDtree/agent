@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import random
 
-from ..types import Lorebook, LoreEntry, RuntimeContext, RuntimeEvent
+from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent
 from .events import RuntimeEventSink
 from .helpers import stable_int_seed
-from .session_state import LorebookSessionState
+from .session_state import LoreBookSessionState
 
 
 class LoreFilterStage:
     """Filter stage: delay, cooldown, role, probability."""
 
-    def __init__(self, lorebook: Lorebook, state: LorebookSessionState, sink: RuntimeEventSink):
+    def __init__(self, lorebook: LoreBook, state: LoreBookSessionState, sink: RuntimeEventSink):
         self._lorebook = lorebook
         self._state = state
         self._sink = sink

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from ..types import Lorebook, LoreEntry, RuntimeContext, RuntimeEvent
+from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent
 from .events import RuntimeEventSink
 
 
@@ -11,7 +11,7 @@ class LoreSorter:
 
     def __init__(
         self,
-        lorebook: Lorebook,
+        lorebook: LoreBook,
         sink: RuntimeEventSink,
     ):
         self._lorebook = lorebook

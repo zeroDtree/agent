@@ -3,13 +3,13 @@ from __future__ import annotations
 import datetime as dt
 import time
 
-from ..types import Lorebook, RuntimeContext, RuntimeEvent, Stage
+from ..types import LoreBook, RuntimeContext, RuntimeEvent, Stage
 
 
 class RuntimeEventSink:
     """Emits structured runtime events when log_level is not off."""
 
-    def __init__(self, lorebook: Lorebook):
+    def __init__(self, lorebook: LoreBook):
         self._lorebook = lorebook
 
     def event(

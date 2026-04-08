@@ -1,12 +1,12 @@
-"""Lorebook runtime pipeline: scan, match, filter, expand, sort, inject."""
+"""LoreBook runtime pipeline: scan, match, filter, expand, sort, inject."""
 
 from ..types import RuntimeContext, RuntimeResult
-from .engine import LorebookRuntimeEngine
-from .orchestrator import MultiLorebookRuntimeEngine
+from .engine import LoreBookRuntimeEngine
+from .orchestrator import MultiLoreBookRuntimeEngine
 
 __all__ = [
-    "LorebookRuntimeEngine",
-    "MultiLorebookRuntimeEngine",
+    "LoreBookRuntimeEngine",
+    "MultiLoreBookRuntimeEngine",
     "RuntimeContext",
     "RuntimeResult",
 ]

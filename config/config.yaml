@@ -1,6 +1,7 @@
 defaults:
   - system: default
   - log: default
+  - chat: default
   - work: default
   - llm: deepseek
   - ekb: default

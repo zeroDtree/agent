@@ -7,7 +7,7 @@ from pathlib import Path
 from .types import RuntimeEvent
 
 
-class LorebookEventLogger:
+class LoreBookEventLogger:
     def __init__(self, log_path: str | Path = "logs/lorebook-events.jsonl"):
         self.log_path = Path(log_path)
         self.log_path.parent.mkdir(parents=True, exist_ok=True)

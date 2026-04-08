@@ -1,9 +1,9 @@
 ---
-id: english-code-generate
-title: English code generation policy
-enabled: true
+id: python-linter
+title: Python Linter
+enabled: false
 triggers:
-  keywords: ["code", "function", "class", "script", "refactor", "implement"]
+  keywords: ["python", "linter", "ruff", "pylint"]
   regex: []
   case_sensitive: false
   whole_word: false
@@ -24,9 +24,18 @@ advanced:
   cooldown_turns: 0
   delay_turns: 0
 budget:
-  max_tokens: 1000
+  max_tokens: 5000
   truncate: tail
 ---
 
-Write generated source code, identifiers, comments, docstrings, and developer-facing output in English.
-Prefer clear and simple wording, keep naming consistent, and preserve semantic intent from non-English input.
+Use the following command to check the Python code:
+
+```bash
+ruff check <file_path>
+```
+
+Use the following command to check and fix the code style of the Python code:
+
+```bash
+ruff check --fix <file_path>
+```

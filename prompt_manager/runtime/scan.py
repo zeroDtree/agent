@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from ..types import Lorebook, LoreEntry
+from ..types import LoreBook, LoreEntry
 
 
 class ActiveEntryScanner:
     """Scan stage: collect enabled entries from the lorebook."""
 
-    def __init__(self, lorebook: Lorebook):
+    def __init__(self, lorebook: LoreBook):
         self._lorebook = lorebook
 
     def collect_enabled_entries(self) -> list[LoreEntry]:

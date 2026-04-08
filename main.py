@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 from pathlib import Path
 
 import gnureadline  # noqa: F401
@@ -15,9 +14,9 @@ from prompt_toolkit.history import InMemoryHistory
 
 from config.config_class import AutoMode, GraphConfig, LLMConfig, ToolConfig, WorkConfig
 from graphs.graph import Graph
+from prompt_manager.preset import build_preset_result
 from tools import get_all_tools
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
-from utils.preset import build_preset_messages
 
 _PROJECT_ROOT = Path(__file__).resolve().parent
 
@@ -132,6 +131,24 @@ def _resolve_role_prompt_path(prompt_dir: Path, role_name: str) -> str:
     return str((prompt_dir / f"{role_name}.md").relative_to(_PROJECT_ROOT))
 
 
+def _resolve_conversation_dir(cfg: DictConfig) -> Path:
+    chat_cfg = cfg.get("chat")
+    configured = str(chat_cfg.get("conversation_dir", "data/conversations")) if chat_cfg else "data/conversations"
+    conversation_dir = Path(configured).expanduser()
+    if not conversation_dir.is_absolute():
+        conversation_dir = (_PROJECT_ROOT / conversation_dir).resolve()
+    return conversation_dir
+
+
+def _resolve_conversation_path(raw_path: str, default_dir: Path) -> Path:
+    candidate = Path(raw_path).expanduser()
+    if candidate.is_absolute():
+        return candidate
+    if candidate.parent != Path("."):
+        return candidate
+    return default_dir / candidate
+
+
 # ---------------------------------------------------------------------------
 # Main chat loop
 # ---------------------------------------------------------------------------
@@ -143,10 +160,11 @@ async def chat_loop(graph, cfg, logger, tools: list):
         auto_suggest=AutoSuggestFromHistory(),
     )
 
-    is_first = True
     conversation_history: list = []
+    last_built_messages: list | None = None
     turn_index = 0
     char_cfg = cfg.get("char")
+    default_conversation_dir = _resolve_conversation_dir(cfg)
     lorebook_ids = list(char_cfg.get("lorebook_ids", [])) if char_cfg else []
     prompt_dir = _resolve_prompt_dir(str(char_cfg.get("prompt_dir", "prompts/chars")) if char_cfg else "prompts/chars")
     current_role = str(char_cfg.get("active", "main")) if char_cfg else "main"
@@ -159,6 +177,27 @@ async def chat_loop(graph, cfg, logger, tools: list):
         print(f"No role prompts found in {prompt_dir}. Falling back to default prompt behavior.")
 
     current_prompt_path = _resolve_role_prompt_path(prompt_dir, current_role) if available_roles else None
+
+    preset_segments_enabled = None
+    preset_segment_order = None
+    persona_prompt_path = None
+    if char_cfg:
+        persona_raw = char_cfg.get("persona_prompt_path")
+        persona_prompt_path = str(persona_raw) if persona_raw else None
+        preset_cfg = char_cfg.get("preset")
+        if preset_cfg is not None:
+            preset_plain = omegaconf.OmegaConf.to_container(preset_cfg, resolve=True)
+            if isinstance(preset_plain, dict):
+                segments_raw = preset_plain.get("segments")
+                if isinstance(segments_raw, dict):
+                    preset_segments_enabled = {
+                        str(key): bool(value["enabled"])
+                        for key, value in segments_raw.items()
+                        if isinstance(value, dict) and "enabled" in value
+                    }
+                order_raw = preset_plain.get("segment_order")
+                if isinstance(order_raw, list):
+                    preset_segment_order = [str(item) for item in order_raw]
 
     print("Welcome to MyCodex CLI!")
     print(f"Using model: {cfg.llm.model_name}")
@@ -185,8 +224,9 @@ async def chat_loop(graph, cfg, logger, tools: list):
                     "  !char list                   - list available character roles\n"
                     "  !char show                   - show active role\n"
                     "  !char set <role>             - switch active role for next turns\n"
-                    "  !save <filename>             - save conversation to file\n"
-                    "  !load <filename>             - load conversation from file\n"
+                    "  !save <filename>             - save conversation to default history directory\n"
+                    "  !load <filename>             - load conversation from default history directory\n"
+                    "  !preset                      - print the last built preset sent to the model\n"
                     "  !clear                       - clear conversation history\n"
                     "  !history                     - show conversation history\n"
                     "  exit / quit                  - exit CLI\n"
@@ -220,7 +260,6 @@ async def chat_loop(graph, cfg, logger, tools: list):
                         else:
                             current_role = target_role
                             current_prompt_path = _resolve_role_prompt_path(prompt_dir, current_role)
-                            is_first = True
                             print(f"Active role switched to: {current_role}")
                 else:
                     print("Unknown !char command. Use !char list | !char show | !char set <role>.")
@@ -231,12 +270,14 @@ async def chat_loop(graph, cfg, logger, tools: list):
                 if len(parts) < 2:
                     print("Usage: !save <filename>")
                     continue
-                filename = parts[1].strip()
+                raw_path = parts[1].strip()
+                save_path = _resolve_conversation_path(raw_path, default_conversation_dir)
                 try:
+                    save_path.parent.mkdir(parents=True, exist_ok=True)
                     data = [{"type": type(m).__name__, "content": m.content} for m in conversation_history]
-                    with open(filename, "w") as f:
+                    with save_path.open("w", encoding="utf-8") as f:
                         json.dump(data, f, indent=2, ensure_ascii=False)
-                    print(f"Conversation saved to {filename} ({len(data)} messages)")
+                    print(f"Conversation saved to {save_path} ({len(data)} messages)")
                 except Exception as e:
                     print(f"Save failed: {e}")
                 continue
@@ -246,25 +287,25 @@ async def chat_loop(graph, cfg, logger, tools: list):
                 if len(parts) < 2:
                     print("Usage: !load <filename>")
                     continue
-                filename = parts[1].strip()
-                if not os.path.exists(filename):
-                    print(f"File not found: {filename}")
+                raw_path = parts[1].strip()
+                load_path = _resolve_conversation_path(raw_path, default_conversation_dir)
+                if not load_path.exists():
+                    print(f"File not found: {load_path}")
                     continue
                 try:
-                    with open(filename, "r") as f:
+                    with load_path.open("r", encoding="utf-8") as f:
                         loaded = json.load(f)
                     type_map = {"HumanMessage": HumanMessage, "AIMessage": AIMessage, "ToolMessage": ToolMessage}
                     for item in loaded:
                         cls = type_map.get(item.get("type"), HumanMessage)
                         conversation_history.append(cls(content=item["content"]))
-                    print(f"Loaded {len(loaded)} messages from {filename}")
+                    print(f"Loaded {len(loaded)} messages from {load_path}")
                 except Exception as e:
                     print(f"Load failed: {e}")
                 continue
 
             if user_input.startswith("!clear"):
                 conversation_history.clear()
-                is_first = True
                 print("Conversation history cleared.")
                 continue
 
@@ -275,6 +316,17 @@ async def chat_loop(graph, cfg, logger, tools: list):
                     role = type(m).__name__.replace("Message", "")
                     content = str(m.content)[:120]
                     print(f"[{i}] {role}: {content}")
+                continue
+
+            if user_input.startswith("!preset"):
+                if not last_built_messages:
+                    print("(no preset has been built yet)")
+                    continue
+                print("[Last built preset]")
+                for i, m in enumerate(last_built_messages, start=1):
+                    role = type(m).__name__.replace("Message", "")
+                    print(f"\n[{i}] {role}")
+                    print(str(getattr(m, "content", "")))
                 continue
 
             if user_input.startswith("!tool"):
@@ -301,21 +353,36 @@ async def chat_loop(graph, cfg, logger, tools: list):
                 continue
 
             turn_index += 1
-            preset_messages = build_preset_messages(
+            preset_result = build_preset_result(
                 user_input=user_input,
                 thread_id=str(cfg.system.thread_id),
                 turn_index=turn_index,
                 lorebook_ids=lorebook_ids,
-                include_base_messages=is_first,
+                include_base_messages=True,
                 character_prompt_path=current_prompt_path,
+                persona_prompt_path=persona_prompt_path,
+                preset_segments_enabled=preset_segments_enabled,
+                preset_segment_order=preset_segment_order,
             )
-            messages = preset_messages + conversation_history + [HumanMessage(content=user_input)]
-            is_first = False
+            if preset_result.injected_entries_with_order:
+                print("[LoreBook triggered entries]")
+                for index, (entry_id, entry_order) in enumerate(preset_result.injected_entries_with_order, start=1):
+                    if entry_order is None:
+                        print(f"  {index}. {entry_id}")
+                    else:
+                        print(f"  {index}. {entry_id} (order={entry_order})")
+            else:
+                print("[LoreBook triggered entries]")
+                print("  (none)")
+            messages = preset_result.messages + conversation_history + [HumanMessage(content=user_input)]
+            last_built_messages = messages
 
             streaming_printed_tool_keys: set = set()
             streaming_appended_history_keys: set = set()
             nonstreaming_emitted_message_keys: set = set()
             streamed_ai = False
+            # Keep chronological order: user message for this turn, then model/tool replies.
+            turn_tail_messages: list = []
 
             if cfg.llm.streaming:
                 async for part in graph.astream(
@@ -348,7 +415,7 @@ async def chat_loop(graph, cfg, logger, tools: list):
                             mid = getattr(m, "id", None) or hash(str(m.content))
                             if mid in streaming_appended_history_keys:
                                 continue
-                            conversation_history.append(m)
+                            turn_tail_messages.append(m)
                             streaming_appended_history_keys.add(mid)
                 if streamed_ai:
                     print()
@@ -366,9 +433,10 @@ async def chat_loop(graph, cfg, logger, tools: list):
                         if msg_id not in nonstreaming_emitted_message_keys:
                             print(msg.content)
                             nonstreaming_emitted_message_keys.add(msg_id)
-                            conversation_history.append(msg)
+                            turn_tail_messages.append(msg)
 
             conversation_history.append(HumanMessage(content=user_input))
+            conversation_history.extend(turn_tail_messages)
 
         except KeyboardInterrupt:
             print("\nExiting CLI...")

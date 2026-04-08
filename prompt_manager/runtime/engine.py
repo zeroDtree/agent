@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from ..types import Lorebook, LoreEntry, RuntimeContext, RuntimeEvent, RuntimeResult
+from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent, RuntimeResult
 from .events import RuntimeEventSink
 from .expand import LoreExpander
 from .filter import LoreFilterStage
 from .inject import LoreInjector
 from .match import LoreMatcher
 from .scan import ActiveEntryScanner
-from .session_state import LorebookSessionState
+from .session_state import LoreBookSessionState
 from .sort import LoreSorter
 
 
@@ -22,10 +22,10 @@ class PreInjectResult:
     events: list[RuntimeEvent]
 
 
-class LorebookRuntimeEngine:
-    def __init__(self, lorebook: Lorebook):
+class LoreBookRuntimeEngine:
+    def __init__(self, lorebook: LoreBook):
         self.lorebook = lorebook
-        self._state = LorebookSessionState(lorebook)
+        self._state = LoreBookSessionState(lorebook)
         self._sink = RuntimeEventSink(lorebook)
         self._scanner = ActiveEntryScanner(lorebook)
         self._matcher = LoreMatcher(lorebook, self._state, self._sink)

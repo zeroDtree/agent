@@ -76,7 +76,7 @@ def build_lorebook(source: Path, output: Path) -> dict[str, Any]:
         raise ValueError(f"No Markdown entries found under: {entries_dir}")
 
     book_defaults = {
-        "position": "after_char_defs",
+        "position": "after_character",
         "probability": 1.0,
         "case_sensitive": False,
     }

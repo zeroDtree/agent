@@ -1,15 +1,15 @@
 from __future__ import annotations
 
-from ..types import Lorebook, LoreEntry, RuntimeContext, RuntimeEvent
+from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent
 from .events import RuntimeEventSink
 from .helpers import clip_text_to_token_budget, token_count
-from .session_state import LorebookSessionState
+from .session_state import LoreBookSessionState
 
 
 class LoreInjector:
     """Inject stage: per-entry body prep, outlets, book budget, sticky/cooldown updates."""
 
-    def __init__(self, lorebook: Lorebook, state: LorebookSessionState, sink: RuntimeEventSink):
+    def __init__(self, lorebook: LoreBook, state: LoreBookSessionState, sink: RuntimeEventSink):
         self._lorebook = lorebook
         self._state = state
         self._sink = sink

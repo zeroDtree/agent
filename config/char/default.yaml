@@ -2,3 +2,16 @@ active: "main"
 prompt_dir: "prompts/chars"
 lorebook_ids:
   - "coding-default"
+persona_prompt_path: null
+preset:
+  segment_order:
+    - core
+    - character
+    - persona
+  segments:
+    core:
+      enabled: true
+    character:
+      enabled: true
+    persona:
+      enabled: false

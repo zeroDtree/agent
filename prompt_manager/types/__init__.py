@@ -4,8 +4,8 @@ Split across ``conversation``, ``lorebook``, and ``runtime`` modules. Re-exporte
 ``prompt_manager.types`` imports.
 
 Conversation-layer types (`Message`, `Preset`, `Chat`, `PersonaMessages`, `CharacterCard`, `Persona`) model the
-prompt organization described in project docs. Lorebook types mirror the `lorebook.json` shape
-(after `builder`) and the inputs/outputs of `LorebookRuntimeEngine`, aligned with
+prompt organization described in project docs. LoreBook types mirror the `lorebook.json` shape
+(after `builder`) and the inputs/outputs of `LoreBookRuntimeEngine`, aligned with
 `schemas/lorebook.schema.json`.
 
 Field documentation is attached via ``dataclasses.field(metadata={"description": ...})`` for
@@ -23,9 +23,8 @@ from .lorebook import (
     EntryResolved,
     EntryTriggers,
     LoreBook,
-    Lorebook,
-    LorebookBudget,
-    LorebookDefaults,
+    LoreBookBudget,
+    LoreBookDefaults,
     LoreEntry,
     MergePolicy,
     RuntimeConfig,
@@ -45,9 +44,8 @@ __all__ = [
     "EntryTriggers",
     "LoreBook",
     "LoreEntry",
-    "Lorebook",
-    "LorebookBudget",
-    "LorebookDefaults",
+    "LoreBookBudget",
+    "LoreBookDefaults",
     "MergePolicy",
     "Message",
     "MessageType",

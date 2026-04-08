@@ -2,7 +2,6 @@
 id: python-env-rule
 title: Python command execution policy
 enabled: true
-priority: 100
 triggers:
   keywords: ["python", "pytest", "script", "uv run"]
   regex: []
@@ -12,7 +11,7 @@ filters:
   role_allowlist: ["assistant"]
   role_denylist: []
 injection:
-  position: after_char_defs
+  position: after_character
   order: 100
   outlet: null
 advanced:

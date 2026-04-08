@@ -1,140 +1,242 @@
-## 1. Prompt Organization (inspired by [SillyTavern](https://docs.sillytavern.app/usage/core-concepts/worldinfo/))
+# Prompt manager (inspired by [SillyTavern World Info](https://docs.sillytavern.app/usage/core-concepts/worldinfo/))
 
-- **Message**: The smallest interaction unit. Common types include `System`, `User`, `Assistant`, and `Tool`.
-- **Preset**: The final Message sequence sent to the model.
-- **Chat**: A Message sequence representing one conversation context (chat history).
-- **LoreBook / World Info / World Book**: A collection of Messages that are triggered by rules and dynamically injected into the Preset.
-- **Character Card**: A Message collection representing a logical entity that interacts with the user or other chars (shortened as Char). It can bind one Preset and multiple LoreBooks.
-- **Persona**: A Message collection representing the user's persona (identity mask), i.e., the role from which the user talks to a Char.
+This document describes the **implemented** Python package `prompt_manager`: data shapes, build/load, runtime pipeline, and the LangChain-oriented preset helper. Field types match `prompt_manager/types` and `schemas/lorebook.schema.json` unless noted.
 
-Prompt directory structure example:
+Open the Mermaid blocks in a Mermaid-capable viewer (IDE preview, GitHub, etc.).
 
-```text
-prompts/
-  core/
-    system.md
-    safety.md
-    output_contract.md
-  chars/
-    coding_agent.md
-    reviewer_agent.md
-  lorebooks/
-    lorebook_id/
-      lorebook.json
-      entries/
-        <entry_id>.md
-  personas/
-    student.md
+---
+
+## Responsibilities
+
+| Piece                                   | Role                                                                                                                                                                                                                                                                         |
+| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `prompt_manager.builder.build_lorebook` | Reads `entries/*.md` (YAML front matter + body), merges book defaults, writes `lorebook.json`.                                                                                                                                                                               |
+| `prompt_manager.loader.load_lorebook`   | Parses `lorebook.json` into `LoreBook` and nested dataclasses.                                                                                                                                                                                                               |
+| `LoreBookRuntimeEngine`                 | Runs **scan → match → filter → expand → sort → inject** for one book; produces `RuntimeResult` (concatenated `injected_prompt`, entry ids, events).                                                                                                                          |
+| `MultiLoreBookRuntimeEngine`            | Runs the pre-inject pipeline per book, then **globally** orders candidates and applies a **combined** token budget (sum of each book’s `budget.max_tokens`).                                                                                                                 |
+| `prompt_manager.preset`                 | Host integration: runs lorebook runtime with `RuntimeContext`, maps injections to **LangChain** `BaseMessage` lists and anchor positions (`before_core`, `after_character`, …). Optional `LoreBookEventLogger` appends `RuntimeEvent` lines to `logs/lorebook-events.jsonl`. |
+
+---
+
+## Runtime pipeline (single book)
+
+1. **scan** — Collect enabled entries; skip whole book if `LoreBook.enabled` is false.
+2. **match** — Keyword / regex against **combined** text: `RuntimeContext.text` plus `source_texts` entries whose scope is both in `active_sources` and in the book’s `source_scope`. Sticky / cooldown / delay are applied via `LoreBookSessionState` (see `session_state.py`).
+3. **filter** — Role allow/deny lists and probability gates (`EntryAdvanced.probability`, seeded per `RuntimeConfig.random_seed_strategy` unless `RuntimeContext.seed` is set).
+4. **expand** — For entries with `advanced.recursive`, re-run match/filter on nested text up to `runtime.max_recursion_steps` waves.
+5. **sort** — Inclusion groups: at most one winner per `advanced.inclusion_group` (optional `group_scoring` using match scores). Then order by `EntryInjection.order` according to `runtime.injection_order` (`small_first` vs `great_first`).
+6. **inject** — Enforce per-entry budget (`EntryBudget`), then book budget (`LoreBookBudget`): either `drop_low_priority` or merge-and-truncate (`truncate_tail` / `truncate_head`). Outlets: entries with `injection.outlet` set are dropped unless that name appears in `RuntimeContext.outlet_references`.
+
+**Multi-book:** each engine runs through **expand**; then all candidates are sorted by `(injection.order, lorebook.id, entry.id)` and injected under one shared budget. This path does **not** read `merge_strategy` or `merge_policy` (those fields are stored for schema/interop; the current multi-book merge behavior is fixed as above).
+
+**Structured logging:** `RuntimeEvent` uses `stage` in `{"scan","match","filter","expand","sort","inject"}` (see `Stage` in `types/lorebook.py`). `RuntimeEvent.action` / `reason` are short strings from the engine (e.g. `matched`, `dropped`, `keyword_hit`).
+
+---
+
+## LoreBook type model (dataclasses)
+
+Types live in `prompt_manager/types/lorebook.py`. `InjectionPositionType` is a `StrEnum` of string values consumed by the host (`preset` maps them to segment boundaries).
+
+```mermaid
+classDiagram
+  direction TB
+
+  class InjectionPositionType {
+    <<enumeration>>
+    BEFORE_CORE
+    AFTER_CORE
+    BEFORE_CHARACTER
+    AFTER_CHARACTER
+    BEFORE_PERSONA
+    AFTER_PERSONA
+    DEPTH
+    OUTLET
+  }
+
+  class LoreBook {
+    +str id
+    +str name
+    +bool enabled
+    +str description
+    +str merge_strategy
+    +LoreBookBudget budget
+    +LoreBookDefaults defaults
+    +list~LoreEntry~ entries
+    +list source_scope
+    +MergePolicy merge_policy
+    +RuntimeConfig runtime
+  }
+
+  class LoreEntry {
+    +str id
+    +str path
+    +bool enabled
+    +str content
+    +EntryResolved resolved
+  }
+
+  class EntryResolved {
+    +EntryTriggers triggers
+    +EntryFilters filters
+    +EntryInjection injection
+    +EntryAdvanced advanced
+    +EntryBudget budget
+  }
+
+  class EntryTriggers {
+    +list keywords
+    +list regex
+    +bool case_sensitive
+    +bool whole_word
+  }
+
+  class EntryFilters {
+    +list role_allowlist
+    +list role_denylist
+  }
+
+  class EntryInjection {
+    +InjectionPositionType position
+    +int order
+    +MessageType message_type
+    +str outlet
+    +int depth
+  }
+
+  class EntryAdvanced {
+    +str inclusion_group
+    +bool group_scoring
+    +float probability
+    +bool recursive
+    +int max_recursion_depth
+    +int sticky_turns
+    +int cooldown_turns
+    +int delay_turns
+  }
+
+  class EntryBudget {
+    +int max_tokens
+    +str truncate
+  }
+
+  class LoreBookBudget {
+    +int max_tokens
+    +str overflow_policy
+  }
+
+  class LoreBookDefaults {
+    +InjectionPositionType position
+    +float probability
+    +bool case_sensitive
+  }
+
+  class RuntimeConfig {
+    +int max_recursion_steps
+    +str random_seed_strategy
+    +str log_level
+    +str injection_order
+  }
+
+  class MergePolicy {
+    +str mode
+    +list priority
+  }
+
+  LoreBook "1" *-- "many" LoreEntry : entries
+  LoreBook *-- LoreBookBudget
+  LoreBook *-- LoreBookDefaults
+  LoreBook *-- RuntimeConfig
+  LoreBook *-- MergePolicy
+  LoreEntry *-- EntryResolved
+  EntryResolved *-- EntryTriggers
+  EntryResolved *-- EntryFilters
+  EntryResolved *-- EntryInjection
+  EntryResolved *-- EntryAdvanced
+  EntryResolved *-- EntryBudget
+  EntryInjection ..> InjectionPositionType : position
 ```
 
-- `<lorebook_id>`: Unique lorebook identifier. Use kebab-case, for example `coding-default`.
-- `<entry_id>`: Unique entry identifier. Use kebab-case and keep it unique within one lorebook, for example `python-env-rule`.
+Diagram notes (precision):
 
+- **`merge_strategy` / `MergePolicy.mode`:** literals `global_sorted_merge` \| `character_first` in code and schema. The runtime engines above do not branch on these today.
+- **`EntryInjection`:** `message_type` is `MessageType | None` (see `types/conversation.py`). `outlet` is `str | None`. `depth` is `int | None` (used when `position` is `DEPTH`).
+- **`EntryBudget.truncate`:** `Literal["head","tail","none"]`.
+- **`LoreBookBudget.overflow_policy`:** `Literal["drop_low_priority","truncate_tail","truncate_head"]`.
+- **`RuntimeConfig`:** `random_seed_strategy` is `session_stable` \| `request_random`; `log_level` is `off` \| `normal` \| `debug`; `injection_order` is `small_first` \| `great_first`.
+- **`source_scope`:** elements are `Literal["global","character","persona","chat"]`.
 
-## 2. Lorebook Role in the Architecture
+---
 
-A Lorebook is essentially a dynamic context injector:
+## Activation types (`types/runtime.py`)
 
-- It activates entries by conditions such as keywords, regex, and vector similarity.
-- It injects selected entries into target prompt positions within budget constraints.
-- It only loads knowledge relevant to the current turn, preventing permanent prompt bloat.
+```mermaid
+classDiagram
+  direction TB
 
-Note: A Lorebook only increases the probability that the model sees specific information. It does not guarantee that the output will always reflect that information.
+  class RuntimeContext {
+    +str request_id
+    +str session_id
+    +str role
+    +str text
+    +dict source_texts
+    +set tags
+    +set active_sources
+    +set outlet_references
+    +int turn_index
+    +int seed
+  }
 
-Context-specific source scopes:
+  class RuntimeResult {
+    +str injected_prompt
+    +list matched_entries
+    +list injected_entries
+    +dict dropped_reasons
+    +list events
+  }
 
-- **Global**: Global LoreBook.
-- **Character Lore**: Character-specific LoreBook.
-- **Persona Lorebook**: LoreBook bound to the current Persona.
-- **Chat Lorebook**: LoreBook bound to a single conversation session.
+  class RuntimeEvent {
+    +str ts
+    +str request_id
+    +str session_id
+    +str lorebook_id
+    +str stage
+    +str action
+    +str reason
+    +str entry_id
+    +dict metrics
+  }
 
+  RuntimeResult *-- "many" RuntimeEvent : events
+```
 
-## 3. Lorebook Entry Model (Entry Schema)
+`RuntimeContext.seed` is `int | None` in code (optional override for probability seeding). See `types/runtime.py` for defaults on other fields.
 
-- **`LoreEntry` (`prompt_manager/types/lorebook.py`)**
-  - `id: str`
-    - Unique entry identifier (kebab-case).
-  - `path: str`
-    - Source file path of the entry (typically `entries/<id>.md`).
-  - `enabled: bool`
-    - Whether this entry is enabled.
-  - `content: str`
-    - Final body text to inject (or write to an outlet).
-  - `resolved: EntryResolved`
-    - Normalized parameters after build, used directly at runtime.
+---
 
-- **`EntryResolved` (runtime parameter aggregation)**
-  - `triggers: EntryTriggers`
-    - **`keywords: list[str]`**: Keyword trigger (matching any one keyword makes it a candidate).
-    - **`regex: list[str]`**: Regex trigger (evaluated in parallel with keywords).
-    - **`case_sensitive: bool`**: Case sensitivity for both keywords and regex.
-    - **`whole_word: bool`**: Whether keyword matching uses word boundaries (use carefully for CJK and similar scripts).
-  - `filters: EntryFilters`
-    - **`role_allowlist: list[str]`**: If non-empty, only these roles are allowed.
-    - **`role_denylist: list[str]`**: Any match is rejected.
-  - `injection: EntryInjection`
-    - **`position: InjectionPositionType`**: Injection position type.
-      - Current enum values in code: `before_char_defs` / `after_char_defs` / `depth` / `outlet`.
-    - **`order: int`**: Ordering weight among candidates in the same batch (combined with `runtime.injection_order`).
-    - **`message_type: MessageType | None`**: Message role field. The current injector does not branch by this field and only preserves it in the model.
-    - **`outlet: str | None`**: Writes to a named outlet. If the host does not reference that outlet, it is dropped during injection.
-    - **`depth: int | None`**: Depth parameter when `position=depth`.
-  - `advanced: EntryAdvanced`
-    - **`inclusion_group: str | None`**: Mutual exclusion group (only one entry is kept per group).
-    - **`group_scoring: bool`**: Whether to prioritize by match score within the group.
-    - **`probability: float`**: Probability gate (0~1).
-    - **`recursive: bool`**: Whether recursive expansion is enabled.
-    - **`max_recursion_depth: int`**: Entry-level recursion depth limit (0 means only the global limit applies).
-    - **`sticky_turns: int`**: Number of turns an entry can stay active after trigger.
-    - **`cooldown_turns: int`**: Cooldown turns after trigger.
-    - **`delay_turns: int`**: Earliest turn index at which the entry can trigger.
-  - `budget: EntryBudget`
-    - **`max_tokens: int`**: Entry-level token budget upper bound.
-    - **`truncate: "head" | "tail" | "none"`**: Truncation policy when over budget.
+## Conversation-layer types (`types/conversation.py`)
 
-- **`RuntimeContext` (`prompt_manager/types/runtime.py`, strongly related to entry activation)**
-  - `text: str`
-    - Primary scan text (usually current turn input).
-  - `source_texts: dict[SourceScope, str]` + `active_sources: set[SourceScope]`
-    - Additional scan sources (such as character/persona/chat).
-  - `role: str`
-    - Used by `EntryFilters` for role-based filtering.
-  - `outlet_references: set[str]`
-    - Outlet names referenced by the template. Entries targeting unreferenced outlets are dropped.
-  - `turn_index: int`
-    - Used for timing effects (`delay/sticky/cooldown`).
-  - `seed: int | None`
-    - Random seed for probability gating (can override default strategy).
+Used for higher-level prompt assembly (not the JSON lorebook file):
 
-## 4. Activation Pipeline (Engine View)
+- **`Message`**, **`MessageType`** (`system` \| `user` \| `assistant` \| `tool`).
+- **`Preset`**, **`Chat`**, **`PersonaMessages`:** type aliases for `list[Message]` (semantics differ by usage).
+- **`CharacterCard`**, **`Persona`:** identity + optional `lorebook_ids` on the character side.
 
-- **`LorebookRuntimeEngine` actual stages (6 steps)**
-  - **1) Scan (`ActiveEntryScanner.collect_enabled_entries`)**
-    - Collect only entries with `entry.enabled == true`.
-  - **2) Match (`LoreMatcher`)**
-    - Match based on `EntryTriggers.keywords/regex`.
-    - Supports `whole_word` and `case_sensitive`.
-    - Supports direct sticky hits (no need to match keywords again this turn).
-    - Scan text comes from `RuntimeContext.text + source_texts(active_sources)`.
-  - **3) Filter (`LoreFilterStage`)**
-    - Applies `delay_turns` and `cooldown_turns`.
-    - Applies `filters.role_allowlist/role_denylist`.
-    - Applies `advanced.probability` gating.
-  - **4) Expand (`LoreExpander`)**
-    - Performs recursive expansion matching for entries with `advanced.recursive=true`.
-    - Constrained jointly by `runtime.max_recursion_steps` and `advanced.max_recursion_depth`.
-  - **5) Sort (`LoreSorter`)**
-    - Resolves `inclusion_group` mutual exclusion first.
-    - If `group_scoring=true`, prioritize by match score.
-    - Then sort by `injection.order` (direction controlled by `runtime.injection_order`).
-  - **6) Inject (`LoreInjector`)**
-    - Applies `EntryBudget` first (entry-level budget and truncation).
-    - Then applies `LorebookBudget` (lorebook-level budget and `overflow_policy`).
-    - Drops entries with `injection.outlet` not referenced by `outlet_references`.
-    - Updates session state after injection (`sticky/cooldown`).
+---
 
-## 5. Budget and Stability Strategy
+## Schema and codegen
 
-- Set a fixed budget upper bound for each Lorebook (absolute token count or a ratio of context size).
-- Keep always-on entries as few as possible; within budget, prioritize higher-priority entries.
-- When budget is insufficient, prioritize safety, protocol, and task-critical entries.
+- **`schemas/lorebook.schema.json`** — JSON Schema for `lorebook.json` (aligned with builder output and loader).
+- Field descriptions on dataclasses use `field(metadata=...)` via `types/common.py` for tooling.
+
+---
+
+## Related files (reference)
+
+| Path                                     | Purpose                              |
+| ---------------------------------------- | ------------------------------------ |
+| `prompt_manager/builder.py`              | Compile entries → JSON               |
+| `prompt_manager/loader.py`               | JSON → `LoreBook`                    |
+| `prompt_manager/runtime/engine.py`       | `LoreBookRuntimeEngine`              |
+| `prompt_manager/runtime/orchestrator.py` | `MultiLoreBookRuntimeEngine`         |
+| `prompt_manager/preset.py`               | LangChain messages + segment anchors |
+| `prompt_manager/logger.py`               | JSONL event append                   |

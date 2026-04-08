@@ -3,21 +3,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from ..types import LoreEntry, RuntimeContext, RuntimeEvent, RuntimeResult
-from .engine import LorebookRuntimeEngine
+from .engine import LoreBookRuntimeEngine
 from .helpers import token_count
 
 
 @dataclass(slots=True)
 class _GlobalCandidate:
-    engine: LorebookRuntimeEngine
+    engine: LoreBookRuntimeEngine
     entry: LoreEntry
     order: int
 
 
-class MultiLorebookRuntimeEngine:
+class MultiLoreBookRuntimeEngine:
     """Run multiple lorebooks, then globally sort/inject one merged result."""
 
-    def __init__(self, engines: list[LorebookRuntimeEngine]):
+    def __init__(self, engines: list[LoreBookRuntimeEngine]):
         self._engines = engines
 
     def run(self, context: RuntimeContext) -> RuntimeResult:

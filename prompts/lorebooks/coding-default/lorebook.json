@@ -24,7 +24,7 @@
     "overflow_policy": "drop_low_priority"
   },
   "defaults": {
-    "position": "after_char_defs",
+    "position": "after_character",
     "probability": 1.0,
     "case_sensitive": false
   },
@@ -60,7 +60,7 @@
           "role_denylist": []
         },
         "injection": {
-          "position": "after_char_defs",
+          "position": "after_character",
           "order": 90,
           "message_type": null,
           "outlet": null,
@@ -106,7 +106,7 @@
           "role_denylist": []
         },
         "injection": {
-          "position": "after_char_defs",
+          "position": "after_character",
           "order": 100,
           "message_type": null,
           "outlet": null,

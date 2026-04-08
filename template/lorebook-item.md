@@ -1,9 +1,9 @@
 ---
-id: english-code-generate
-title: English code generation policy
+id: new-entry-id
+title: New entry title
 enabled: true
 triggers:
-  keywords: ["code", "function", "class", "script", "refactor", "implement"]
+  keywords: ["keyword1", "keyword2"]
   regex: []
   case_sensitive: false
   whole_word: false
@@ -24,9 +24,8 @@ advanced:
   cooldown_turns: 0
   delay_turns: 0
 budget:
-  max_tokens: 1000
+  max_tokens: 5000
   truncate: tail
 ---
 
-Write generated source code, identifiers, comments, docstrings, and developer-facing output in English.
-Prefer clear and simple wording, keep naming consistent, and preserve semantic intent from non-English input.
+Entry content...

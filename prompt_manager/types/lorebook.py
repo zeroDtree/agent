@@ -1,4 +1,4 @@
-"""Lorebook schema and runtime-facing type definitions.
+"""LoreBook schema and runtime-facing type definitions.
 
 This module defines the normalized data shapes used across build and runtime
 stages: trigger matching, filtering, sorting, and final injection.
@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Literal, TypeAlias
+from typing import TYPE_CHECKING, Literal
 
 from .common import _md
 
@@ -72,8 +72,12 @@ class EntryFilters:
 class InjectionPositionType(StrEnum):
     """Canonical placement modes for matched lore content."""
 
-    BEFORE_CHAR_DEFS = "before_char_defs"
-    AFTER_CHAR_DEFS = "after_char_defs"
+    BEFORE_CORE = "before_core"
+    AFTER_CORE = "after_core"
+    BEFORE_CHARACTER = "before_character"
+    AFTER_CHARACTER = "after_character"
+    BEFORE_PERSONA = "before_persona"
+    AFTER_PERSONA = "after_persona"
     DEPTH = "depth"
     OUTLET = "outlet"
 
@@ -83,7 +87,7 @@ class EntryInjection:
     """Where and how a matched entry is materialized in prompt assembly."""
 
     position: InjectionPositionType = field(
-        default=InjectionPositionType.AFTER_CHAR_DEFS,
+        default=InjectionPositionType.AFTER_CHARACTER,
         metadata=_md(
             "Placement mode for this entry. Runtime output is often merged into one string unless the host "
             "keeps structured segments by position."
@@ -247,7 +251,7 @@ class LoreEntry:
 
 
 @dataclass(slots=True)
-class LorebookBudget:
+class LoreBookBudget:
     """Total token budget for the whole lorebook and overflow handling mode."""
 
     max_tokens: int = field(
@@ -267,11 +271,11 @@ class LorebookBudget:
 
 
 @dataclass(slots=True)
-class LorebookDefaults:
+class LoreBookDefaults:
     """Book-level defaults applied when an entry omits a field."""
 
     position: InjectionPositionType = field(
-        default=InjectionPositionType.AFTER_CHAR_DEFS,
+        default=InjectionPositionType.AFTER_CHARACTER,
         metadata=_md("Default injection position type for entries that omit `injection.position`."),
     )
     probability: float = field(
@@ -337,7 +341,7 @@ class RuntimeConfig:
 
 
 @dataclass(slots=True)
-class Lorebook:
+class LoreBook:
     """Aggregated book: metadata, budgets, merge policy, and all entries."""
 
     id: str = field(
@@ -358,10 +362,10 @@ class Lorebook:
             "to avoid contradictory ordering expectations."
         ),
     )
-    budget: LorebookBudget = field(
+    budget: LoreBookBudget = field(
         metadata=_md("Aggregate token budget and overflow behavior for this book."),
     )
-    defaults: LorebookDefaults = field(
+    defaults: LoreBookDefaults = field(
         metadata=_md("Default trigger and injection values merged into each entry at build time."),
     )
     entries: list[LoreEntry] = field(
@@ -379,7 +383,3 @@ class Lorebook:
         default_factory=RuntimeConfig,
         metadata=_md("Engine-level limits and logging tied to this book."),
     )
-
-
-# Doc parity name for World Info / LoreBook; identical to `Lorebook`.
-LoreBook: TypeAlias = Lorebook

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ..types import Lorebook, LoreEntry, RuntimeContext, RuntimeEvent
+from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent
 from .events import RuntimeEventSink
 from .filter import LoreFilterStage
 from .match import LoreMatcher
@@ -11,7 +11,7 @@ class LoreExpander:
 
     def __init__(
         self,
-        lorebook: Lorebook,
+        lorebook: LoreBook,
         matcher: LoreMatcher,
         filter_stage: LoreFilterStage,
         sink: RuntimeEventSink,

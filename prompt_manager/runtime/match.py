@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import re
 
-from ..types import Lorebook, LoreEntry, RuntimeContext, RuntimeEvent
+from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent
 from .events import RuntimeEventSink
-from .session_state import LorebookSessionState
+from .session_state import LoreBookSessionState
 
 
 class LoreMatcher:
     """Match stage: keyword/regex triggers and sticky entries."""
 
-    def __init__(self, lorebook: Lorebook, state: LorebookSessionState, sink: RuntimeEventSink):
+    def __init__(self, lorebook: LoreBook, state: LoreBookSessionState, sink: RuntimeEventSink):
         self._lorebook = lorebook
         self._state = state
         self._sink = sink

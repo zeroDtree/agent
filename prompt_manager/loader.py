@@ -10,16 +10,16 @@ from .types import (
     EntryInjection,
     EntryResolved,
     EntryTriggers,
-    Lorebook,
-    LorebookBudget,
-    LorebookDefaults,
+    LoreBook,
+    LoreBookBudget,
+    LoreBookDefaults,
     LoreEntry,
     MergePolicy,
     RuntimeConfig,
 )
 
 
-def load_lorebook(path: str | Path) -> Lorebook:
+def load_lorebook(path: str | Path) -> LoreBook:
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     entries: list[LoreEntry] = []
     for raw_entry in data.get("entries", []):
@@ -40,7 +40,7 @@ def load_lorebook(path: str | Path) -> Lorebook:
             )
         )
 
-    return Lorebook(
+    return LoreBook(
         id=data["id"],
         name=data["name"],
         enabled=data["enabled"],
@@ -48,8 +48,8 @@ def load_lorebook(path: str | Path) -> Lorebook:
         merge_strategy=data["merge_strategy"],
         source_scope=data.get("source_scope", ["global"]),
         merge_policy=MergePolicy(**data.get("merge_policy", {})),
-        budget=LorebookBudget(**data["budget"]),
-        defaults=LorebookDefaults(**data["defaults"]),
+        budget=LoreBookBudget(**data["budget"]),
+        defaults=LoreBookDefaults(**data["defaults"]),
         runtime=RuntimeConfig(**data.get("runtime", {})),
         entries=entries,
     )

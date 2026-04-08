@@ -58,7 +58,7 @@ class CharacterCard:
     )
     lorebook_ids: list[str] = field(
         default_factory=list,
-        metadata=_md("Identifiers of `Lorebook` resources to attach; resolved by the host."),
+        metadata=_md("Identifiers of `LoreBook` resources to attach; resolved by the host."),
     )
 
 

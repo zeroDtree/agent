@@ -46,10 +46,13 @@
         "position": {
           "type": "string",
           "enum": [
-            "before_char_defs",
-            "after_char_defs",
+            "before_core",
+            "after_core",
+            "before_character",
+            "after_character",
+            "before_persona",
+            "after_persona",
             "depth",
-            "message",
             "outlet"
           ]
         },
@@ -109,10 +112,13 @@
             "position": {
               "type": "string",
               "enum": [
-                "before_char_defs",
-                "after_char_defs",
+                "before_core",
+                "after_core",
+                "before_character",
+                "after_character",
+                "before_persona",
+                "after_persona",
                 "depth",
-                "message",
                 "outlet"
               ]
             },
@@ -146,23 +152,6 @@
           "else": {
             "properties": {
               "depth": { "type": "null" }
-            }
-          }
-        },
-        {
-          "if": {
-            "properties": { "position": { "const": "message" } },
-            "required": ["position"]
-          },
-          "then": {
-            "properties": {
-              "message_type": { "type": "string", "enum": ["system", "user", "assistant"] }
-            },
-            "required": ["message_type"]
-          },
-          "else": {
-            "properties": {
-              "message_type": { "type": "null" }
             }
           }
         }

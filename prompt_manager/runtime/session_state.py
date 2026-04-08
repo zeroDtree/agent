@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from ..types import Lorebook, LoreEntry, RuntimeContext
+from ..types import LoreBook, LoreEntry, RuntimeContext
 
 
-class LorebookSessionState:
+class LoreBookSessionState:
     """Per-engine sticky and cooldown maps keyed by (session_id, lorebook_id, entry_id)."""
 
-    def __init__(self, lorebook: Lorebook):
+    def __init__(self, lorebook: LoreBook):
         self._lorebook = lorebook
         self._sticky_state: dict[tuple[str, str, str], int] = {}
         self._cooldown_state: dict[tuple[str, str, str], int] = {}
