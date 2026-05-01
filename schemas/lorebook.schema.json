@@ -3,7 +3,7 @@
   "$id": "https://example.local/schemas/lorebook.schema.json",
   "title": "LoreBook Schema",
   "type": "object",
-  "required": ["id", "name", "enabled", "merge_strategy", "budget", "defaults", "entries"],
+  "required": ["id", "name", "enabled", "budget", "entries"],
   "additionalProperties": false,
   "properties": {
     "id": { "type": "string", "minLength": 1 },
@@ -15,7 +15,6 @@
       "items": { "type": "string", "enum": ["global", "character", "persona", "chat"] },
       "uniqueItems": true
     },
-    "merge_strategy": { "type": "string", "enum": ["global_sorted_merge", "character_first"] },
     "merge_policy": {
       "type": "object",
       "additionalProperties": false,
@@ -38,40 +37,13 @@
         "overflow_policy": { "type": "string", "enum": ["drop_low_priority", "truncate_tail", "truncate_head"] }
       }
     },
-    "defaults": {
-      "type": "object",
-      "required": ["position", "probability", "case_sensitive"],
-      "additionalProperties": false,
-      "properties": {
-        "position": {
-          "type": "string",
-          "enum": [
-            "before_core",
-            "after_core",
-            "before_character",
-            "after_character",
-            "before_persona",
-            "after_persona",
-            "depth",
-            "outlet"
-          ]
-        },
-        "probability": { "type": "number", "minimum": 0, "maximum": 1 },
-        "case_sensitive": { "type": "boolean" }
-      }
-    },
     "runtime": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "max_recursion_steps": { "type": "integer", "minimum": 0 },
         "random_seed_strategy": { "type": "string", "enum": ["session_stable", "request_random"] },
-        "log_level": { "type": "string", "enum": ["off", "normal", "debug"] },
-        "injection_order": {
-          "type": "string",
-          "enum": ["small_first", "great_first"],
-          "description": "Sort entries by injection.order ascending (small_first) or descending (great_first)."
-        }
+        "log_level": { "type": "string", "enum": ["off", "normal", "debug"] }
       },
       "required": ["max_recursion_steps", "random_seed_strategy", "log_level"]
     },
@@ -95,21 +67,17 @@
     },
     "filters": {
       "type": "object",
-      "required": ["role_allowlist", "role_denylist"],
       "additionalProperties": false,
-      "properties": {
-        "role_allowlist": { "type": "array", "items": { "type": "string" } },
-        "role_denylist": { "type": "array", "items": { "type": "string" } }
-      }
+      "properties": {}
     },
     "injection": {
       "allOf": [
         {
           "type": "object",
-          "required": ["position", "order", "message_type", "outlet", "depth"],
+          "required": ["position_type", "order", "message_type", "depth"],
           "additionalProperties": false,
           "properties": {
-            "position": {
+            "position_type": {
               "type": "string",
               "enum": [
                 "before_core",
@@ -118,8 +86,7 @@
                 "after_character",
                 "before_persona",
                 "after_persona",
-                "depth",
-                "outlet"
+                "depth"
               ]
             },
             "order": { "type": "integer" },
@@ -129,7 +96,6 @@
                 { "type": "string", "enum": ["system", "user", "assistant"] }
               ]
             },
-            "outlet": { "type": ["string", "null"] },
             "depth": {
               "oneOf": [
                 { "type": "null" },
@@ -140,8 +106,8 @@
         },
         {
           "if": {
-            "properties": { "position": { "const": "depth" } },
-            "required": ["position"]
+            "properties": { "position_type": { "const": "depth" } },
+            "required": ["position_type"]
           },
           "then": {
             "properties": {

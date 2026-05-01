@@ -1,242 +1,114 @@
-# Prompt manager (inspired by [SillyTavern World Info](https://docs.sillytavern.app/usage/core-concepts/worldinfo/))
+# How the prompt system works
 
-This document describes the **implemented** Python package `prompt_manager`: data shapes, build/load, runtime pipeline, and the LangChain-oriented preset helper. Field types match `prompt_manager/types` and `schemas/lorebook.schema.json` unless noted.
-
-Open the Mermaid blocks in a Mermaid-capable viewer (IDE preview, GitHub, etc.).
+The system has two ideas: **lorebooks** (dynamic snippets that may attach when the conversation matches rules) and a **preset skeleton** (fixed blocks such as system core, character, and persona). At request time, matching lorebook text is merged into that skeleton and becomes the model’s context.
 
 ---
 
-## Responsibilities
+## What lives on disk
 
-| Piece                                   | Role                                                                                                                                                                                                                                                                         |
-| --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `prompt_manager.builder.build_lorebook` | Reads `entries/*.md` (YAML front matter + body), merges book defaults, writes `lorebook.json`.                                                                                                                                                                               |
-| `prompt_manager.loader.load_lorebook`   | Parses `lorebook.json` into `LoreBook` and nested dataclasses.                                                                                                                                                                                                               |
-| `LoreBookRuntimeEngine`                 | Runs **scan → match → filter → expand → sort → inject** for one book; produces `RuntimeResult` (concatenated `injected_prompt`, entry ids, events).                                                                                                                          |
-| `MultiLoreBookRuntimeEngine`            | Runs the pre-inject pipeline per book, then **globally** orders candidates and applies a **combined** token budget (sum of each book’s `budget.max_tokens`).                                                                                                                 |
-| `prompt_manager.preset`                 | Host integration: runs lorebook runtime with `RuntimeContext`, maps injections to **LangChain** `BaseMessage` lists and anchor positions (`before_core`, `after_character`, …). Optional `LoreBookEventLogger` appends `RuntimeEvent` lines to `logs/lorebook-events.jsonl`. |
-
----
-
-## Runtime pipeline (single book)
-
-1. **scan** — Collect enabled entries; skip whole book if `LoreBook.enabled` is false.
-2. **match** — Keyword / regex against **combined** text: `RuntimeContext.text` plus `source_texts` entries whose scope is both in `active_sources` and in the book’s `source_scope`. Sticky / cooldown / delay are applied via `LoreBookSessionState` (see `session_state.py`).
-3. **filter** — Role allow/deny lists and probability gates (`EntryAdvanced.probability`, seeded per `RuntimeConfig.random_seed_strategy` unless `RuntimeContext.seed` is set).
-4. **expand** — For entries with `advanced.recursive`, re-run match/filter on nested text up to `runtime.max_recursion_steps` waves.
-5. **sort** — Inclusion groups: at most one winner per `advanced.inclusion_group` (optional `group_scoring` using match scores). Then order by `EntryInjection.order` according to `runtime.injection_order` (`small_first` vs `great_first`).
-6. **inject** — Enforce per-entry budget (`EntryBudget`), then book budget (`LoreBookBudget`): either `drop_low_priority` or merge-and-truncate (`truncate_tail` / `truncate_head`). Outlets: entries with `injection.outlet` set are dropped unless that name appears in `RuntimeContext.outlet_references`.
-
-**Multi-book:** each engine runs through **expand**; then all candidates are sorted by `(injection.order, lorebook.id, entry.id)` and injected under one shared budget. This path does **not** read `merge_strategy` or `merge_policy` (those fields are stored for schema/interop; the current multi-book merge behavior is fixed as above).
-
-**Structured logging:** `RuntimeEvent` uses `stage` in `{"scan","match","filter","expand","sort","inject"}` (see `Stage` in `types/lorebook.py`). `RuntimeEvent.action` / `reason` are short strings from the engine (e.g. `matched`, `dropped`, `keyword_hit`).
-
----
-
-## LoreBook type model (dataclasses)
-
-Types live in `prompt_manager/types/lorebook.py`. `InjectionPositionType` is a `StrEnum` of string values consumed by the host (`preset` maps them to segment boundaries).
+Each lorebook is a **folder** named by its book id. Inside it, Markdown files under `entries/` hold one rule-bearing snippet each. A build step turns those files into a single JSON artifact the runtime reads.
 
 ```mermaid
-classDiagram
-  direction TB
-
-  class InjectionPositionType {
-    <<enumeration>>
-    BEFORE_CORE
-    AFTER_CORE
-    BEFORE_CHARACTER
-    AFTER_CHARACTER
-    BEFORE_PERSONA
-    AFTER_PERSONA
-    DEPTH
-    OUTLET
-  }
-
-  class LoreBook {
-    +str id
-    +str name
-    +bool enabled
-    +str description
-    +str merge_strategy
-    +LoreBookBudget budget
-    +LoreBookDefaults defaults
-    +list~LoreEntry~ entries
-    +list source_scope
-    +MergePolicy merge_policy
-    +RuntimeConfig runtime
-  }
-
-  class LoreEntry {
-    +str id
-    +str path
-    +bool enabled
-    +str content
-    +EntryResolved resolved
-  }
-
-  class EntryResolved {
-    +EntryTriggers triggers
-    +EntryFilters filters
-    +EntryInjection injection
-    +EntryAdvanced advanced
-    +EntryBudget budget
-  }
-
-  class EntryTriggers {
-    +list keywords
-    +list regex
-    +bool case_sensitive
-    +bool whole_word
-  }
-
-  class EntryFilters {
-    +list role_allowlist
-    +list role_denylist
-  }
-
-  class EntryInjection {
-    +InjectionPositionType position
-    +int order
-    +MessageType message_type
-    +str outlet
-    +int depth
-  }
-
-  class EntryAdvanced {
-    +str inclusion_group
-    +bool group_scoring
-    +float probability
-    +bool recursive
-    +int max_recursion_depth
-    +int sticky_turns
-    +int cooldown_turns
-    +int delay_turns
-  }
-
-  class EntryBudget {
-    +int max_tokens
-    +str truncate
-  }
-
-  class LoreBookBudget {
-    +int max_tokens
-    +str overflow_policy
-  }
-
-  class LoreBookDefaults {
-    +InjectionPositionType position
-    +float probability
-    +bool case_sensitive
-  }
-
-  class RuntimeConfig {
-    +int max_recursion_steps
-    +str random_seed_strategy
-    +str log_level
-    +str injection_order
-  }
-
-  class MergePolicy {
-    +str mode
-    +list priority
-  }
-
-  LoreBook "1" *-- "many" LoreEntry : entries
-  LoreBook *-- LoreBookBudget
-  LoreBook *-- LoreBookDefaults
-  LoreBook *-- RuntimeConfig
-  LoreBook *-- MergePolicy
-  LoreEntry *-- EntryResolved
-  EntryResolved *-- EntryTriggers
-  EntryResolved *-- EntryFilters
-  EntryResolved *-- EntryInjection
-  EntryResolved *-- EntryAdvanced
-  EntryResolved *-- EntryBudget
-  EntryInjection ..> InjectionPositionType : position
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#f0f7ee', 'primaryBorderColor': '#6aa84f', 'lineColor': '#8fbc8f'}}}%%
+flowchart TB
+  F["Book folder (id = folder name)"]
+  F --> MD["entries/*.md — YAML front matter + body"]
+  F --> JSON["Compiled book JSON"]
+  MD -->|"build"| JSON
 ```
 
-Diagram notes (precision):
-
-- **`merge_strategy` / `MergePolicy.mode`:** literals `global_sorted_merge` \| `character_first` in code and schema. The runtime engines above do not branch on these today.
-- **`EntryInjection`:** `message_type` is `MessageType | None` (see `types/conversation.py`). `outlet` is `str | None`. `depth` is `int | None` (used when `position` is `DEPTH`).
-- **`EntryBudget.truncate`:** `Literal["head","tail","none"]`.
-- **`LoreBookBudget.overflow_policy`:** `Literal["drop_low_priority","truncate_tail","truncate_head"]`.
-- **`RuntimeConfig`:** `random_seed_strategy` is `session_stable` \| `request_random`; `log_level` is `off` \| `normal` \| `debug`; `injection_order` is `small_first` \| `great_first`.
-- **`source_scope`:** elements are `Literal["global","character","persona","chat"]`.
+- **Book id** = the folder name, not a single file.
+- **Entry id** = optional `id` in front matter; if omitted, it defaults to the file name without the `.md` suffix.
+- If Markdown sources are present, the book is typically **rebuilt** when loaded so edits apply without a separate compile step; if only the JSON exists, that file is used as-is.
 
 ---
 
-## Activation types (`types/runtime.py`)
+## End-to-end shape
 
 ```mermaid
-classDiagram
-  direction TB
-
-  class RuntimeContext {
-    +str request_id
-    +str session_id
-    +str role
-    +str text
-    +dict source_texts
-    +set tags
-    +set active_sources
-    +set outlet_references
-    +int turn_index
-    +int seed
-  }
-
-  class RuntimeResult {
-    +str injected_prompt
-    +list matched_entries
-    +list injected_entries
-    +dict dropped_reasons
-    +list events
-  }
-
-  class RuntimeEvent {
-    +str ts
-    +str request_id
-    +str session_id
-    +str lorebook_id
-    +str stage
-    +str action
-    +str reason
-    +str entry_id
-    +dict metrics
-  }
-
-  RuntimeResult *-- "many" RuntimeEvent : events
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#e8f2fc', 'primaryBorderColor': '#5b8fc7', 'lineColor': '#7a9ab8'}}}%%
+flowchart LR
+  subgraph sources["Sources"]
+    LB["One or more lorebooks"]
+    SK["Preset skeleton files"]
+  end
+  subgraph request["Per request"]
+    C["User text + session + tags"]
+  end
+  subgraph out["Output"]
+    MSG["Ordered messages for the model"]
+  end
+  LB --> C
+  SK --> C
+  C -->|"select & budget"| MSG
 ```
 
-`RuntimeContext.seed` is `int | None` in code (optional override for probability seeding). See `types/runtime.py` for defaults on other fields.
+The runtime sees **user text**, **session identity**, **turn index**, and optional **tags**. Lorebook entries that **match** can be **filtered** (probability, cooldowns, stickiness, etc.), **expanded** (e.g. recursive pulls), then **ordered** and **injected** under a **shared token budget**. The preset layer then **splices** that injected content into the skeleton at configured positions (next to core / character / persona, by depth, or as overflow).
 
 ---
 
-## Conversation-layer types (`types/conversation.py`)
+## Single-book pipeline (conceptual)
 
-Used for higher-level prompt assembly (not the JSON lorebook file):
+```mermaid
+flowchart LR
+  A[Scan enabled entries] --> B[Match triggers vs request text]
+  B --> C[Filter gates]
+  C --> D[Expand dependencies]
+```
 
-- **`Message`**, **`MessageType`** (`system` \| `user` \| `assistant` \| `tool`).
-- **`Preset`**, **`Chat`**, **`PersonaMessages`:** type aliases for `list[Message]` (semantics differ by usage).
-- **`CharacterCard`**, **`Persona`:** identity + optional `lorebook_ids` on the character side.
+**Match** uses triggers (keywords, regex, case flags, etc.) against the incoming text (and related sources when active). **Filter** applies per-entry rules so not every match becomes content. **Expand** can pull in linked entries so the final set is closed before ordering.
 
----
-
-## Schema and codegen
-
-- **`schemas/lorebook.schema.json`** — JSON Schema for `lorebook.json` (aligned with builder output and loader).
-- Field descriptions on dataclasses use `field(metadata=...)` via `types/common.py` for tooling.
+**Sort** and **budgeted injection** happen when results from one or more books are merged: entries get an ordering key; the pipeline walks them and stops adding text when the combined budget is exhausted, recording what was dropped and why.
 
 ---
 
-## Related files (reference)
+## Multiple books
 
-| Path                                     | Purpose                              |
-| ---------------------------------------- | ------------------------------------ |
-| `prompt_manager/builder.py`              | Compile entries → JSON               |
-| `prompt_manager/loader.py`               | JSON → `LoreBook`                    |
-| `prompt_manager/runtime/engine.py`       | `LoreBookRuntimeEngine`              |
-| `prompt_manager/runtime/orchestrator.py` | `MultiLoreBookRuntimeEngine`         |
-| `prompt_manager/preset.py`               | LangChain messages + segment anchors |
-| `prompt_manager/logger.py`               | JSONL event append                   |
+When several lorebooks are active, each book runs the **match → filter → expand** path on the **same request**, then **orders** its own expanded set. All candidates are **combined**, **re-sorted globally** (order, then book id, then entry id), and **one** injection pass applies **one** total budget (conceptually: sum of per-book budgets). Injected items are tracked as **book id : entry id** so names stay unambiguous.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#fdf6ec', 'primaryBorderColor': '#d4a574', 'lineColor': '#c9a882'}}}%%
+flowchart TB
+  subgraph books["Each active book"]
+    P1[Match / filter / expand]
+    P2[Match / filter / expand]
+  end
+  U[Union of candidates]
+  G[Global sort]
+  B[Single budgeted inject]
+  books --> U --> G --> B
+```
+
+---
+
+## Preset skeleton + where lorebook text lands
+
+The skeleton is a **fixed sequence of segments** (e.g. core instructions, optional character block, optional persona, optional depth-oriented block). Lorebook entries declare **where** they attach: before or after a segment, relative to **depth** in the thread, or unknown placement falls to the **end**.
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {'primaryColor': '#f4eef8', 'primaryBorderColor': '#9b72b0', 'lineColor': '#b39bc8'}}}%%
+flowchart TB
+  subgraph sk["Skeleton walk order"]
+    S1[Core]
+    S2[Character]
+    S3[Persona]
+    S4[Depth]
+  end
+  SK["Final message list"]
+  sk --> SK
+  INJ["Matched lorebook bodies"] -->|"before / after / depth / tail"| SK
+```
+
+Each injected snippet can also map to a **message role** (e.g. system vs user) so the merged list stays valid for the chat API.
+
+---
+
+## Defaults and observability
+
+If the caller does not pick lorebooks, the integration may fall back to a **default book id** (project-specific). The pipeline can emit **structured events** (stage, action, optional entry id, metrics) for debugging: what matched, what was filtered, what was injected or dropped for budget.
+
+---
+
+## Mental model in one line
+
+**Static preset bones + conditional lorebook meat**, selected by triggers and session rules, merged under a token budget, and laid out into one ordered conversation for the model.

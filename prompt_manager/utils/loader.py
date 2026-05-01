@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 import json
+from dataclasses import fields
 from pathlib import Path
 
-from .types import (
+from ..types import (
     EntryAdvanced,
     EntryBudget,
     EntryFilters,
@@ -12,7 +13,6 @@ from .types import (
     EntryTriggers,
     LoreBook,
     LoreBookBudget,
-    LoreBookDefaults,
     LoreEntry,
     MergePolicy,
     RuntimeConfig,
@@ -32,7 +32,7 @@ def load_lorebook(path: str | Path) -> LoreBook:
                 content=raw_entry["content"],
                 resolved=EntryResolved(
                     triggers=EntryTriggers(**resolved["triggers"]),
-                    filters=EntryFilters(**resolved["filters"]),
+                    filters=EntryFilters(),
                     injection=EntryInjection(**resolved["injection"]),
                     advanced=EntryAdvanced(**resolved["advanced"]),
                     budget=EntryBudget(**resolved["budget"]),
@@ -40,16 +40,18 @@ def load_lorebook(path: str | Path) -> LoreBook:
             )
         )
 
+    runtime_raw = data.get("runtime", {})
+    runtime_keys = {f.name for f in fields(RuntimeConfig)}
+    runtime_data = {k: v for k, v in runtime_raw.items() if k in runtime_keys}
+
     return LoreBook(
         id=data["id"],
         name=data["name"],
         enabled=data["enabled"],
         description=data.get("description", ""),
-        merge_strategy=data["merge_strategy"],
         source_scope=data.get("source_scope", ["global"]),
         merge_policy=MergePolicy(**data.get("merge_policy", {})),
         budget=LoreBookBudget(**data["budget"]),
-        defaults=LoreBookDefaults(**data["defaults"]),
-        runtime=RuntimeConfig(**data.get("runtime", {})),
+        runtime=RuntimeConfig(**runtime_data),
         entries=entries,
     )

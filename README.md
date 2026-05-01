@@ -16,8 +16,9 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
     - [3.6. Common Startup Overrides](#36-common-startup-overrides)
     - [3.7. Interactive CLI commands](#37-interactive-cli-commands)
   - [4. Configuration](#4-configuration)
-    - [4.1. Hydra Config Map](#41-hydra-config-map)
-    - [4.2. MCP Runtime Model](#42-mcp-runtime-model)
+    - [4.1. Optional Environment Variables](#41-optional-environment-variables)
+    - [4.2. Hydra Config Map](#42-hydra-config-map)
+    - [4.3. MCP Runtime Model](#43-mcp-runtime-model)
   - [5. Auto Mode Reference](#5-auto-mode-reference)
   - [6. Tooling Model](#6-tooling-model)
     - [6.1. Local Built-In Tools](#61-local-built-in-tools)
@@ -32,7 +33,7 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
 - **MCP tool federation**: Loads tools from configured MCP servers; unavailable servers are skipped.
 - **Shell command tool**: Executes commands with configurable timeout and working directory.
 - **Embedding Knowledge Base (EKB)**: Supports semantic retrieval over indexed files.
-- **Prompt manager** (`prompt_manager/`): Compiles `prompts/lorebooks/*/entries` to `lorebook.json`, runs trigger-based injection at each turn, and merges results with core/character/persona segments (see `doc/prompt_manager.md`).
+- **Prompt manager** (`prompt_manager/`): Builds lorebook JSON from `prompts/lorebooks/*/entries/*.md` (or loads existing JSON), then each turn runs match → filter → expand → sort → budgeted inject, and splices the result into the preset skeleton (core, character, persona, and optional depth anchors). See [doc/prompt_manager.md](doc/prompt_manager.md).
 - **Hydra-based configuration**: Hierarchical YAML composition with command-line overrides.
 - **Container support**: Includes Docker scripts for build and startup.
 
@@ -48,24 +49,6 @@ Required for LLM requests:
 | ----------------- | -------- | --------------------------------------------------------------------------------------- |
 | `OPENAI_API_KEY`  | Yes      | API key used by `config/llm/deepseek.yaml`.                                             |
 | `OPENAI_API_BASE` | Yes      | Base URL used by `config/llm/deepseek.yaml` (for example DeepSeek-compatible endpoint). |
-
-Optional runtime variable:
-
-| Variable     | Required | Description                                                                                           |
-| ------------ | -------- | ----------------------------------------------------------------------------------------------------- |
-| `UV_PROJECT` | No       | Path passed to `uv run --project` in startup scripts. If unset, scripts use the default project path. |
-
-Optional variables for the `knowledge_graph` MCP server (Neo4j):
-
-| Variable                      | Default                 | Description                             |
-| ----------------------------- | ----------------------- | --------------------------------------- |
-| `NEO4J_URI`                   | `bolt://localhost:7687` | Neo4j connection URI.                   |
-| `NEO4J_USER`                  | `neo4j`                 | Neo4j username.                         |
-| `NEO4J_PASSWORD`              | `password`              | Neo4j password.                         |
-| `NEO4J_DATABASE`              | `neo4j`                 | Neo4j database name.                    |
-| `NEO4J_QUERY_TIMEOUT_SECONDS` | `6`                     | Query timeout in seconds.               |
-| `KG_DEFAULT_LIMIT`            | `20`                    | Default result limit for graph queries. |
-| `KG_MAX_LIMIT`                | `100`                   | Upper bound for graph query results.    |
 
 Example:
 
@@ -140,7 +123,26 @@ After `bash shell_scripts/start.sh` (or `bash shell_scripts/start.docker.sh` in 
 
 ## 4. Configuration
 
-### 4.1. Hydra Config Map
+### 4.1. Optional Environment Variables
+
+| Variable     | Required | Description                                                                                           |
+| ------------ | -------- | ----------------------------------------------------------------------------------------------------- |
+| `UV_PROJECT` | No       | Path passed to `uv run --project` in startup scripts. If unset, scripts use the default project path. |
+
+Optional variables for the `knowledge_graph` MCP server (Neo4j):
+
+| Variable                      | Default                 | Description                             |
+| ----------------------------- | ----------------------- | --------------------------------------- |
+| `NEO4J_URI`                   | `bolt://localhost:7687` | Neo4j connection URI.                   |
+| `NEO4J_USER`                  | `neo4j`                 | Neo4j username.                         |
+| `NEO4J_PASSWORD`              | `password`              | Neo4j password.                         |
+| `NEO4J_DATABASE`              | `neo4j`                 | Neo4j database name.                    |
+| `NEO4J_QUERY_TIMEOUT_SECONDS` | `6`                     | Query timeout in seconds.               |
+| `KG_DEFAULT_LIMIT`            | `20`                    | Default result limit for graph queries. |
+| `KG_MAX_LIMIT`                | `100`                   | Upper bound for graph query results.    |
+
+
+### 4.2. Hydra Config Map
 
 Agent configuration is composed from files under `config/`:
 
@@ -157,7 +159,7 @@ Agent configuration is composed from files under `config/`:
 | `config/char/default.yaml`   | Character card, lorebook ids, preset segment toggles/order |
 | `config/ekb/default.yaml`    | Vector DB paths, embedding model, chunking, search limits  |
 
-### 4.2. MCP Runtime Model
+### 4.3. MCP Runtime Model
 
 MCP runtime behavior comes from two sources:
 

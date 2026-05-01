@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict
 from pathlib import Path
 
-from .types import RuntimeEvent
+from ..types import RuntimeEvent
 
 
 class LoreBookEventLogger:

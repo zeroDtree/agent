@@ -1,17 +1,3 @@
-"""Typed data models for conversation primitives, lorebook build output, and runtime activation.
-
-Split across ``conversation``, ``lorebook``, and ``runtime`` modules. Re-exported here for stable
-``prompt_manager.types`` imports.
-
-Conversation-layer types (`Message`, `Preset`, `Chat`, `PersonaMessages`, `CharacterCard`, `Persona`) model the
-prompt organization described in project docs. LoreBook types mirror the `lorebook.json` shape
-(after `builder`) and the inputs/outputs of `LoreBookRuntimeEngine`, aligned with
-`schemas/lorebook.schema.json`.
-
-Field documentation is attached via ``dataclasses.field(metadata={"description": ...})`` for
-introspection and tooling.
-"""
-
 from __future__ import annotations
 
 from .conversation import CharacterCard, Chat, Message, MessageType, Persona, PersonaMessages, Preset
@@ -22,16 +8,20 @@ from .lorebook import (
     EntryInjection,
     EntryResolved,
     EntryTriggers,
+    InjectionPositionType,
+    LogLevel,
     LoreBook,
     LoreBookBudget,
-    LoreBookDefaults,
     LoreEntry,
+    MergeMode,
     MergePolicy,
+    OverflowPolicy,
+    RandomSeedStrategy,
     RuntimeConfig,
     SourceScope,
-    Stage,
+    TruncateMode,
 )
-from .runtime import RuntimeContext, RuntimeEvent, RuntimeResult
+from .runtime import RuntimeContext, RuntimeEvent, RuntimeResult, Stage
 
 __all__ = [
     "CharacterCard",
@@ -42,20 +32,25 @@ __all__ = [
     "EntryInjection",
     "EntryResolved",
     "EntryTriggers",
+    "InjectionPositionType",
     "LoreBook",
-    "LoreEntry",
     "LoreBookBudget",
-    "LoreBookDefaults",
+    "LoreEntry",
+    "LogLevel",
+    "MergeMode",
     "MergePolicy",
     "Message",
     "MessageType",
+    "OverflowPolicy",
     "Persona",
     "PersonaMessages",
     "Preset",
+    "RandomSeedStrategy",
     "RuntimeConfig",
     "RuntimeContext",
     "RuntimeEvent",
     "RuntimeResult",
     "SourceScope",
     "Stage",
+    "TruncateMode",
 ]

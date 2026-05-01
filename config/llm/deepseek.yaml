@@ -1,7 +1,7 @@
-model_name: "deepseek-chat"
+model_name: "deepseek-v4-pro"
 base_url: ${oc.env:OPENAI_API_BASE}
 api_key: ${oc.env:OPENAI_API_KEY}
-max_tokens: 8192
+max_tokens: 384000 # max tokens number for model to output
 streaming: true
 temperature: 1.0
 presence_penalty: 0.0

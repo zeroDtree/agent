@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent
+from collections import deque
+
+from ..types import LoreBook, LoreEntry, RuntimeContext, RuntimeEvent, Stage
 from .events import RuntimeEventSink
 from .filter import LoreFilterStage
 from .match import LoreMatcher
@@ -30,12 +32,15 @@ class LoreExpander:
     ) -> list[LoreEntry]:
         entry_map = {entry.id: entry for entry in self._lorebook.entries if entry.enabled}
         selected = {entry.id: entry for entry in filtered}
-        queue = [entry for entry in filtered if entry.resolved.advanced.recursive]
-        step = 0
+        # Queue keeps (entry, depth) where depth=1 is the first recursive expansion layer.
+        queue: deque[tuple[LoreEntry, int]] = deque(
+            (entry, 1) for entry in filtered if entry.resolved.advanced.recursive
+        )
+        processed_steps = 0
 
-        while queue and step < self._lorebook.runtime.max_recursion_steps:
-            parent_entry = queue.pop(0)
-            step += 1
+        while queue and processed_steps < self._lorebook.runtime.max_recursion_steps:
+            parent_entry, depth = queue.popleft()
+            processed_steps += 1
             nested_context = RuntimeContext(
                 request_id=context.request_id,
                 session_id=context.session_id,
@@ -44,7 +49,6 @@ class LoreExpander:
                 source_texts=context.source_texts,
                 tags=context.tags,
                 active_sources=context.active_sources,
-                outlet_references=context.outlet_references,
                 turn_index=context.turn_index,
                 seed=context.seed,
             )
@@ -54,18 +58,25 @@ class LoreExpander:
                     continue
                 if (
                     candidate.resolved.advanced.max_recursion_depth
-                    and step > candidate.resolved.advanced.max_recursion_depth
+                    and depth > candidate.resolved.advanced.max_recursion_depth
                 ):
                     continue
-                if self._matcher.is_matched(candidate, nested_context, events):
+                score, hit = self._matcher.match_hit_score(candidate, nested_context, events)
+                if hit:
                     reason = self._filter.filter_reason(candidate, nested_context)
                     if reason is None:
                         selected[candidate.id] = candidate
-                        match_scores[candidate.id] = self._matcher.match_score(candidate, nested_context)
+                        match_scores[candidate.id] = score
                         self._sink.event(
-                            events, context, candidate.id, "expand", "matched", "recursive_match", {"step": step}
+                            events,
+                            context,
+                            candidate.id,
+                            Stage.EXPAND,
+                            "matched",
+                            "recursive_match",
+                            {"step": processed_steps, "depth": depth},
                         )
                         if candidate.resolved.advanced.recursive:
-                            queue.append(candidate)
+                            queue.append((candidate, depth + 1))
 
         return list(selected.values())

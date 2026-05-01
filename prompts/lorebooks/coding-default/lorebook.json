@@ -2,14 +2,13 @@
   "id": "coding-default",
   "name": "Coding Default",
   "enabled": true,
-  "description": "LoreBook generated from prompts/lorebooks/coding-default",
+  "description": "LoreBook generated from /Users/zengls/repo/agent/prompts/lorebooks/coding-default",
   "source_scope": [
     "global",
     "character",
     "persona",
     "chat"
   ],
-  "merge_strategy": "global_sorted_merge",
   "merge_policy": {
     "mode": "global_sorted_merge",
     "priority": [
@@ -22,11 +21,6 @@
   "budget": {
     "max_tokens": 2000,
     "overflow_policy": "drop_low_priority"
-  },
-  "defaults": {
-    "position": "after_character",
-    "probability": 1.0,
-    "case_sensitive": false
   },
   "runtime": {
     "max_recursion_steps": 3,
@@ -53,17 +47,11 @@
           "case_sensitive": false,
           "whole_word": false
         },
-        "filters": {
-          "role_allowlist": [
-            "assistant"
-          ],
-          "role_denylist": []
-        },
+        "filters": {},
         "injection": {
-          "position": "after_character",
+          "position_type": "after_character",
           "order": 90,
           "message_type": null,
-          "outlet": null,
           "depth": null
         },
         "advanced": {
@@ -77,7 +65,7 @@
           "delay_turns": 0
         },
         "budget": {
-          "max_tokens": 300,
+          "max_tokens": 1000,
           "truncate": "tail"
         }
       }
@@ -99,17 +87,11 @@
           "case_sensitive": false,
           "whole_word": false
         },
-        "filters": {
-          "role_allowlist": [
-            "assistant"
-          ],
-          "role_denylist": []
-        },
+        "filters": {},
         "injection": {
-          "position": "after_character",
+          "position_type": "after_character",
           "order": 100,
           "message_type": null,
-          "outlet": null,
           "depth": null
         },
         "advanced": {
@@ -124,6 +106,46 @@
         },
         "budget": {
           "max_tokens": 300,
+          "truncate": "tail"
+        }
+      }
+    },
+    {
+      "id": "python-linter",
+      "path": "entries/python-linter.md",
+      "enabled": false,
+      "content": "Use the following command to check the Python code:\n\n```bash\nruff check <file_path>\n```\n\nUse the following command to check and fix the code style of the Python code:\n\n```bash\nruff check --fix <file_path>\n```",
+      "resolved": {
+        "triggers": {
+          "keywords": [
+            "python",
+            "linter",
+            "ruff",
+            "pylint"
+          ],
+          "regex": [],
+          "case_sensitive": false,
+          "whole_word": false
+        },
+        "filters": {},
+        "injection": {
+          "position_type": "after_character",
+          "order": 90,
+          "message_type": null,
+          "depth": null
+        },
+        "advanced": {
+          "inclusion_group": null,
+          "group_scoring": false,
+          "probability": 1.0,
+          "recursive": false,
+          "max_recursion_depth": 0,
+          "sticky_turns": 0,
+          "cooldown_turns": 0,
+          "delay_turns": 0
+        },
+        "budget": {
+          "max_tokens": 5000,
           "truncate": "tail"
         }
       }

@@ -4,14 +4,18 @@ lorebook_ids:
   - "coding-default"
 persona_prompt_path: null
 preset:
+  # Optional layout override (omit for code default: core → character → persona → depth).
   segment_order:
     - core
     - character
     - persona
+    - depth
   segments:
     core:
       enabled: true
     character:
       enabled: true
+    depth:
+      enabled: false
     persona:
       enabled: false

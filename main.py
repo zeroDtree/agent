@@ -196,7 +196,7 @@ async def chat_loop(graph, cfg, logger, tools: list):
                         if isinstance(value, dict) and "enabled" in value
                     }
                 order_raw = preset_plain.get("segment_order")
-                if isinstance(order_raw, list):
+                if isinstance(order_raw, list) and order_raw:
                     preset_segment_order = [str(item) for item in order_raw]
 
     print("Welcome to MyCodex CLI!")
@@ -358,7 +358,6 @@ async def chat_loop(graph, cfg, logger, tools: list):
                 thread_id=str(cfg.system.thread_id),
                 turn_index=turn_index,
                 lorebook_ids=lorebook_ids,
-                include_base_messages=True,
                 character_prompt_path=current_prompt_path,
                 persona_prompt_path=persona_prompt_path,
                 preset_segments_enabled=preset_segments_enabled,
@@ -366,11 +365,16 @@ async def chat_loop(graph, cfg, logger, tools: list):
             )
             if preset_result.injected_entries_with_order:
                 print("[LoreBook triggered entries]")
-                for index, (entry_id, entry_order) in enumerate(preset_result.injected_entries_with_order, start=1):
-                    if entry_order is None:
-                        print(f"  {index}. {entry_id}")
-                    else:
-                        print(f"  {index}. {entry_id} (order={entry_order})")
+                for index, (entry_id, entry_order, entry_depth) in enumerate(
+                    preset_result.injected_entries_with_order, start=1
+                ):
+                    bits: list[str] = []
+                    if entry_order is not None:
+                        bits.append(f"order={entry_order}")
+                    if entry_depth is not None:
+                        bits.append(f"depth={entry_depth}")
+                    suffix = f" ({', '.join(bits)})" if bits else ""
+                    print(f"  {index}. {entry_id}{suffix}")
             else:
                 print("[LoreBook triggered entries]")
                 print("  (none)")

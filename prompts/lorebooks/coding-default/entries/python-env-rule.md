@@ -7,13 +7,9 @@ triggers:
   regex: []
   case_sensitive: false
   whole_word: false
-filters:
-  role_allowlist: ["assistant"]
-  role_denylist: []
 injection:
-  position: after_character
+  position_type: after_character
   order: 100
-  outlet: null
 advanced:
   inclusion_group: null
   group_scoring: false
