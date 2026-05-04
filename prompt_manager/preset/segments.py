@@ -40,8 +40,8 @@ class PresetSegmentAssembler:
 
         if self._segment_enabled(preset_segments_enabled, PresetSegmentId.CORE):
             segments[PresetSegmentId.CORE.value] = [
-                SystemMessage(content=self._reader.read_text("prompts/core/system.md")),
-                AIMessage(content=self._reader.read_first_existing(["prompts/core/ai-ok1.md"])),
+                # SystemMessage(content=self._reader.read_text("prompts/core/system.md")),
+                # AIMessage(content=self._reader.read_first_existing(["prompts/core/ai-ok1.md"])),
                 HumanMessage(content=self._reader.read_text("prompts/core/role_play.md")),
                 AIMessage(content=self._reader.read_text("prompts/core/ai-ok2.md")),
             ]
