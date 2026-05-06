@@ -29,6 +29,7 @@ dependencies = [
 	"neo4j",
 	"jsonschema>=4.23.0",
 	"pylint>=4.0.5",
+	"langchain-deepseek>=1.0.1",
 ]
 
 [dependency-groups]

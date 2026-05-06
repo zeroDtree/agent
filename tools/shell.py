@@ -1,4 +1,6 @@
+import os
 import subprocess
+from pathlib import Path
 
 from langchain_core.tools import tool
 
@@ -8,14 +10,22 @@ _MAX_OUTPUT_CHARS = 20_000
 
 
 def get_run_shell_command_popen_tool(work_config: WorkConfig):
+    working_dir = Path(work_config.working_directory).expanduser()
+    if not working_dir.is_absolute():
+        working_dir = (Path(os.getcwd()) / working_dir).resolve()
+    working_dir_text = str(working_dir)
+    tool_description = (
+        "Execute a shell command and return its output.\n\n"
+        f"Shell commands start in this working directory: {working_dir_text}.\n"
+        "Relative paths in command strings are resolved from that directory.\n"
+        "This directory is independent from Python/uv virtual environment paths.\n\n"
+        "Returns a structured result containing exit code, stdout, and stderr so "
+        "the caller can distinguish between successful and failed executions."
+    )
 
-    @tool
+    @tool(description=tool_description)
     def run_shell_command_popen_tool(command: str) -> str:
-        """Execute a shell command and return its output.
-
-        Returns a structured result containing exit code, stdout, and stderr so
-        the caller can distinguish between successful and failed executions.
-        """
+        """Execute a shell command and return stdout/stderr (see tool description for cwd)."""
         try:
             result = subprocess.run(
                 command,
@@ -23,7 +33,7 @@ def get_run_shell_command_popen_tool(work_config: WorkConfig):
                 capture_output=True,
                 text=True,
                 timeout=work_config.command_timeout,
-                cwd=work_config.working_directory,
+                cwd=str(working_dir),
             )
 
             stdout = result.stdout

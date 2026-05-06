@@ -2,7 +2,7 @@
   "id": "coding-default",
   "name": "Coding Default",
   "enabled": true,
-  "description": "LoreBook generated from /Users/zengls/repo/agent/prompts/lorebooks/coding-default",
+  "description": "LoreBook generated from /tmp/proj_dir/prompts/lorebooks/coding-default",
   "source_scope": [
     "global",
     "character",

@@ -5,7 +5,7 @@ from pathlib import Path
 import gnureadline  # noqa: F401
 import hydra
 import omegaconf
-from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, ToolMessage
+from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage, ToolMessage
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from omegaconf import DictConfig
 from prompt_toolkit import PromptSession
@@ -117,6 +117,13 @@ def _graph_run_config(cfg: DictConfig) -> dict:
     }
 
 
+def _resolve_shell_working_directory(working_directory: str) -> str:
+    resolved = Path(working_directory).expanduser()
+    if not resolved.is_absolute():
+        resolved = (_PROJECT_ROOT / resolved).resolve()
+    return str(resolved)
+
+
 def _resolve_prompt_dir(prompt_dir: str) -> Path:
     return (_PROJECT_ROOT / prompt_dir).resolve()
 
@@ -154,7 +161,7 @@ def _resolve_conversation_path(raw_path: str, default_dir: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 
-async def chat_loop(graph, cfg, logger, tools: list):
+async def chat_loop(graph, cfg, logger, tools: list, work_config: WorkConfig):
     session = PromptSession(
         history=InMemoryHistory(),
         auto_suggest=AutoSuggestFromHistory(),
@@ -177,6 +184,7 @@ async def chat_loop(graph, cfg, logger, tools: list):
         print(f"No role prompts found in {prompt_dir}. Falling back to default prompt behavior.")
 
     current_prompt_path = _resolve_role_prompt_path(prompt_dir, current_role) if available_roles else None
+    shell_working_directory = _resolve_shell_working_directory(work_config.working_directory)
 
     preset_segments_enabled = None
     preset_segment_order = None
@@ -378,7 +386,12 @@ async def chat_loop(graph, cfg, logger, tools: list):
             else:
                 print("[LoreBook triggered entries]")
                 print("  (none)")
-            messages = preset_result.messages + conversation_history + [HumanMessage(content=user_input)]
+            shell_workdir_notice = SystemMessage(
+                content=f"Shell session working directory: {shell_working_directory}"
+            )
+            messages = preset_result.messages + [shell_workdir_notice] + conversation_history + [
+                HumanMessage(content=user_input)
+            ]
             last_built_messages = messages
 
             streaming_printed_tool_keys: set = set()
@@ -474,7 +487,7 @@ async def async_main(cfg: DictConfig):
             tool_config=tool_config,
         ).create_graph(need_memory=True, tools=tools)
 
-        await chat_loop(graph, cfg, logger, tools)
+        await chat_loop(graph, cfg, logger, tools, work_config)
 
     except Exception as e:
         logger.error(f"System startup failed: {e}")

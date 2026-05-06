@@ -91,6 +91,13 @@ The container mounts:
 
 - Project directory: `/tmp/proj_dir`
 - Writable working directory: `/tmp/work_dir`
+- `shell_scripts/start.sh` auto-creates `/tmp/work_dir/.venv` when `++work.working_directory=/tmp/work_dir` is set.
+
+In Docker, use this split as a best practice:
+
+- Read source files from `/tmp/proj_dir` (mounted project root).
+- Write generated artifacts to `/tmp/work_dir` (mounted writable workspace).
+- Keep task-level Python dependencies in `/tmp/work_dir/.venv`.
 
 ### 3.6. Common Startup Overrides
 
@@ -101,6 +108,8 @@ bash shell_scripts/start.sh \
   ++work.auto_mode=whitelist_accept \
   ++work.working_directory=/tmp/work_dir
 ```
+
+When `++work.working_directory` is set to a non-`.` path, startup initializes a dedicated `.venv` under that directory once. This task-level environment is separate from `UV_PROJECT` (the runtime environment used to launch `main.py`).
 
 ### 3.7. Interactive CLI commands
 
