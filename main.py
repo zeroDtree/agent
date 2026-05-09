@@ -88,7 +88,6 @@ async def _load_mcp_tools_with_status(mcp_config) -> tuple[list, list[tuple[str,
         try:
             tools = await client.get_tools(server_name=name)
             all_tools.extend(tools)
-            logger.info("MCP server '%s': loaded %s tools", name, len(tools))
             rows.append((name, len(tools), "ok"))
         except Exception as e:
             logger.warning("MCP server '%s' unavailable, skipping: %s", name, e)

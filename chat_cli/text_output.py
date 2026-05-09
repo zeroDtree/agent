@@ -1,19 +1,28 @@
-"""Plain-text CLI helpers (no Rich)."""
+"""Plain-text CLI helpers; MCP status uses tabulate for aligned tables."""
 
 from __future__ import annotations
 
-import pprint
 import re
 from typing import Any
 
-_SENSITIVE_KEY_RE = re.compile(
-    r"(api[_-]?key|secret|password|token|authorization|bearer|credential)",
+import yaml
+from tabulate import tabulate
+
+# Match credential-like key *names*. Avoid bare "token" — it matches max_tokens, etc.
+_CREDENTIAL_KEY_RE = re.compile(
+    r"(api[_-]?key|client[_-]?secret|secret|password|authorization|bearer|credential)",
     re.IGNORECASE,
 )
 
 
 def _is_sensitive_key(key: str) -> bool:
-    return bool(_SENSITIVE_KEY_RE.search(key))
+    k = key.lower()
+    # Plural / limit-style keys (not secrets).
+    if k.endswith("_tokens"):
+        return False
+    if k == "token" or k.endswith("_token"):
+        return True
+    return bool(_CREDENTIAL_KEY_RE.search(k))
 
 
 def redact_sensitive_mapping(obj: Any) -> Any:
@@ -31,7 +40,15 @@ def redact_sensitive_mapping(obj: Any) -> Any:
 
 def print_config_block(title: str, data: Any) -> None:
     print(f"\n=== {title} ===")
-    pprint.pprint(data, width=100, compact=False)
+    print(
+        yaml.dump(
+            data,
+            default_flow_style=False,
+            sort_keys=False,
+            allow_unicode=True,
+        ),
+        end="",
+    )
     print()
 
 
@@ -39,12 +56,19 @@ def print_mcp_servers_status(rows: list[tuple[str, int, str]]) -> None:
     """Print MCP load summary: server name, tool count, status text."""
     print("\n=== MCP servers ===")
     if not rows:
+        print(tabulate([], headers=["Server", "Tools", "Status"], tablefmt="fancy_grid"))
         print("  (none)")
         print()
         return
-    name_w = max(len(r[0]) for r in rows)
-    for name, n_tools, status in rows:
-        print(f"  {name:<{name_w}}  tools={n_tools:<4}  {status}")
+    body = [[name, n_tools, status] for name, n_tools, status in rows]
+    print(
+        tabulate(
+            body,
+            headers=["Server", "Tools", "Status"],
+            tablefmt="fancy_grid",
+            colalign=("left", "right", "left"),
+        )
+    )
     print()
 
 
