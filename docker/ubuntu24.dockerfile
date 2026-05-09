@@ -37,7 +37,7 @@ COPY --chown=$USERNAME docker/alt_uv_source.sh /tmp/alt_uv_source.sh
 RUN bash /tmp/alt_uv_source.sh && rm -f /tmp/alt_uv_source.sh
 
 COPY --chown=$USERNAME pyproject.toml uv.lock /tmp/agent/
-RUN cd /tmp/agent && uv sync --frozen
+RUN cd /tmp/agent && uv sync
 
 RUN mkdir -p /tmp/proj_dir && mkdir -p /tmp/work_dir
 WORKDIR /tmp/proj_dir
