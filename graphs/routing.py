@@ -19,12 +19,6 @@ def make_chatbot_router(work_config: WorkConfig, tool_config: ToolConfig, logger
             if not (hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0):
                 return END
 
-            tool_names = [tc.get("name", "unknown") for tc in ai_message.tool_calls]
-            if logger:
-                logger.info(f"Tool calls detected: {', '.join(tool_names)}")
-                logger.info(f"with args: {ai_message.tool_calls}")
-                logger.info(f"{work_config.auto_mode}")
-
             mode = work_config.auto_mode
 
             if mode == AutoMode.MANUAL:

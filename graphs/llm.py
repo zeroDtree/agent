@@ -17,6 +17,13 @@ def _uses_deepseek_api(config: LLMConfig) -> bool:
     return "deepseek" in name or "deepseek" in url
 
 
+def _deepseek_extra_body(config: LLMConfig) -> dict[str, Any] | None:
+    thinking = config.thinking
+    if thinking in {"enabled", "disabled"}:
+        return {"thinking": {"type": thinking}}
+    return None
+
+
 class _ChatDeepSeekReasoningRoundTrip(ChatDeepSeek):
     """Echo `reasoning_content` on outbound requests when it is stored on `AIMessage`.
 
@@ -48,6 +55,7 @@ class _ChatDeepSeekReasoningRoundTrip(ChatDeepSeek):
 def get_llm_model(config: LLMConfig) -> BaseChatModel:
     if _uses_deepseek_api(config=config):
         api_key = SecretStr(config.api_key) if config.api_key else None
+        extra_body = _deepseek_extra_body(config=config)
         return cast(
             Any,
             _ChatDeepSeekReasoningRoundTrip(
@@ -59,6 +67,7 @@ def get_llm_model(config: LLMConfig) -> BaseChatModel:
                 temperature=config.temperature,
                 presence_penalty=config.presence_penalty,
                 frequency_penalty=config.frequency_penalty,
+                extra_body=extra_body,
             ),
         )
     _ChatOpenAI = cast(Any, ChatOpenAI)

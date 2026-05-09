@@ -6,3 +6,8 @@ streaming: true
 temperature: 1.0
 presence_penalty: 0.0
 frequency_penalty: 0.0
+# Optional DeepSeek thinking mode override: enabled|disabled.
+# See: https://api-docs.deepseek.com/guides/thinking_mode
+thinking: "enabled"
+# Print model chain-of-thought in the CLI when the API returns reasoning_content.
+show_reasoning: true

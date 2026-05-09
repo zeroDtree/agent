@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Literal
 
 
 class AutoMode(Enum):
@@ -26,6 +27,8 @@ class LLMConfig:
         temperature: float = 1.0,
         presence_penalty: float = 0.0,
         frequency_penalty: float = 0.0,
+        thinking: Literal["enabled", "disabled"] | None = None,
+        show_reasoning: bool = False,
     ):
         self.model_name = model_name
         self.base_url = base_url
@@ -35,6 +38,8 @@ class LLMConfig:
         self.temperature = temperature
         self.presence_penalty = presence_penalty
         self.frequency_penalty = frequency_penalty
+        self.thinking = thinking
+        self.show_reasoning = show_reasoning
 
 
 class WorkConfig:
