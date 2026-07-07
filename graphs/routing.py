@@ -2,7 +2,7 @@ import logging
 
 from langgraph.graph import END
 
-from config.config_class import AutoMode, ToolConfig, WorkConfig
+from config.config_class import ToolApprovalPolicy, ToolConfig, WorkConfig
 from graphs.state import State
 
 
@@ -19,20 +19,20 @@ def make_chatbot_router(work_config: WorkConfig, tool_config: ToolConfig, logger
             if not (hasattr(ai_message, "tool_calls") and len(ai_message.tool_calls) > 0):
                 return END
 
-            mode = work_config.auto_mode
+            policy = work_config.tool_approval
 
-            if mode == AutoMode.MANUAL:
+            if policy == ToolApprovalPolicy.MANUAL:
                 return "human_confirm"
-            elif mode == AutoMode.UNIVERSAL_REJECT:
+            elif policy == ToolApprovalPolicy.UNIVERSAL_REJECT:
                 return "auto_reject"
-            elif mode == AutoMode.UNIVERSAL_ACCEPT:
+            elif policy == ToolApprovalPolicy.UNIVERSAL_ACCEPT:
                 return "my_tools"
-            elif mode == AutoMode.BLACKLIST_REJECT:
+            elif policy == ToolApprovalPolicy.BLACKLIST_REJECT:
                 for tc in ai_message.tool_calls:
                     if not _is_safe(tc.get("name", ""), tc.get("args", {}), tool_config):
                         return "auto_reject"
                 return "human_confirm"
-            elif mode == AutoMode.WHITELIST_ACCEPT:
+            elif policy == ToolApprovalPolicy.WHITELIST_ACCEPT:
                 for tc in ai_message.tool_calls:
                     if not _is_safe(tc.get("name", ""), tc.get("args", {}), tool_config):
                         return "human_confirm"

@@ -1,10 +1,10 @@
-from config.config_class import AutoMode, GraphConfig, LLMConfig, LoggerConfig, ToolConfig, WorkConfig
+from config.config_class import GraphConfig, LLMConfig, LoggerConfig, ToolApprovalPolicy, ToolConfig, WorkConfig
 from graphs.graph import Graph, State
 
 __all__ = [
     "Graph",
     "State",
-    "AutoMode",
+    "ToolApprovalPolicy",
     "GraphConfig",
     "LLMConfig",
     "LoggerConfig",

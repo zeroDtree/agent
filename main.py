@@ -10,7 +10,7 @@ from omegaconf import DictConfig
 from chat_cli import run_chat_loop
 from chat_cli.logging_setup import quiet_http_client_loggers
 from chat_cli.text_output import print_config_block, print_mcp_servers_status, redact_sensitive_mapping
-from config.config_class import AutoMode, GraphConfig, LLMConfig, ToolConfig, WorkConfig
+from config.config_class import GraphConfig, LLMConfig, ToolApprovalPolicy, ToolConfig, WorkConfig
 from graphs.graph import Graph
 from tools import get_all_tools
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
@@ -55,7 +55,7 @@ def _build_configs(
     work_config = WorkConfig(
         working_directory=cfg.work.working_directory,
         command_timeout=cfg.work.command_timeout,
-        auto_mode=AutoMode(cfg.work.auto_mode),
+        tool_approval=ToolApprovalPolicy(cfg.work.tool_approval),
     )
     graph_config = GraphConfig(
         n_max_history=cfg.system.n_max_history,

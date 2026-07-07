@@ -19,7 +19,7 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
     - [4.1. Optional Environment Variables](#41-optional-environment-variables)
     - [4.2. Hydra Config Map](#42-hydra-config-map)
     - [4.3. MCP Runtime Model](#43-mcp-runtime-model)
-  - [5. Auto Mode Reference](#5-auto-mode-reference)
+  - [5. Tool Approval Policy Reference](#5-tool-approval-policy-reference)
   - [6. Tooling Model](#6-tooling-model)
     - [6.1. Local Built-In Tools](#61-local-built-in-tools)
     - [6.2. MCP-Discovered Tools](#62-mcp-discovered-tools)
@@ -29,7 +29,7 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
 ## 2. What This Project Provides
 
 - **Stateful agent runtime**: Uses LangGraph with in-memory conversation state and streaming output.
-- **5-level tool approval policy**: Ranges from fully manual to fully automatic (`work.auto_mode`).
+- **5-level tool approval policy**: Ranges from fully manual to fully automatic (`work.tool_approval`).
 - **MCP tool federation**: Loads tools from configured MCP servers; unavailable servers are skipped.
 - **Shell command tool**: Executes commands with configurable timeout and working directory.
 - **Embedding Knowledge Base (EKB)**: Supports semantic retrieval over indexed files.
@@ -105,7 +105,7 @@ Use Hydra override syntax to customize runtime behavior at launch:
 
 ```bash
 bash shell_scripts/start.sh \
-  ++work.auto_mode=whitelist_accept \
+  ++work.tool_approval=whitelist_accept \
   ++work.working_directory=/tmp/work_dir
 ```
 
@@ -159,7 +159,7 @@ Agent configuration is composed from files under `config/`:
 | ---------------------------- | ---------------------------------------------------------- |
 | `config/config.yaml`         | Top-level defaults composition                             |
 | `config/llm/default.yaml`    | LLM model (LiteLLM), endpoint, sampling parameters         |
-| `config/work/default.yaml`   | Working directory, timeout, auto mode                      |
+| `config/work/default.yaml`   | Working directory, timeout, tool approval policy             |
 | `config/tool/default.yaml`   | Safe and dangerous tools/commands                          |
 | `config/mcp/default.yaml`    | MCP endpoints for tool discovery                           |
 | `config/system/default.yaml` | History length, recursion limit, thread                    |
@@ -183,9 +183,9 @@ Default configured MCP servers:
 | `code_lint`       | `streamable-http`                    | `0.0.0.0:8001` | `http://127.0.0.1:8001/mcp`                |
 | `knowledge_graph` | `streamable-http`                    | `0.0.0.0:8002` | `http://127.0.0.1:8002/mcp`                |
 
-## 5. Auto Mode Reference
+## 5. Tool Approval Policy Reference
 
-Configure approval behavior with `work.auto_mode`:
+Configure approval behavior with `work.tool_approval`:
 
 | Mode                 | Config             | When to use it                                                |
 | -------------------- | ------------------ | ------------------------------------------------------------- |

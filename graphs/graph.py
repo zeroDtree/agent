@@ -5,7 +5,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 
 # Re-export config types so existing callers (main.py) keep working
-from config.config_class import AutoMode, GraphConfig, LLMConfig, LoggerConfig, ToolConfig, WorkConfig
+from config.config_class import GraphConfig, LLMConfig, LoggerConfig, ToolApprovalPolicy, ToolConfig, WorkConfig
 from graphs.nodes import get_auto_reject_node, get_chatbot_node, get_custom_tool_node, get_human_confirm_node
 from graphs.routing import make_chatbot_router
 from graphs.state import State
@@ -14,7 +14,7 @@ from utils.logger import get_and_create_new_log_dir, get_logger
 __all__ = [
     "Graph",
     "State",
-    "AutoMode",
+    "ToolApprovalPolicy",
     "GraphConfig",
     "LLMConfig",
     "LoggerConfig",

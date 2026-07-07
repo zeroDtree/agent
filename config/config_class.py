@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Literal
 
 
-class AutoMode(Enum):
+class ToolApprovalPolicy(Enum):
     MANUAL = "manual"  # all tools require confirmation
     UNIVERSAL_REJECT = "universal_reject"  # auto-reject all tools
     BLACKLIST_REJECT = "blacklist_reject"  # other tools require confirmation
@@ -47,11 +47,11 @@ class WorkConfig:
         self,
         working_directory: str = ".",
         command_timeout: int = 30,
-        auto_mode: AutoMode = AutoMode.MANUAL,
+        tool_approval: ToolApprovalPolicy = ToolApprovalPolicy.MANUAL,
     ):
         self.working_directory = working_directory
         self.command_timeout = command_timeout
-        self.auto_mode = auto_mode
+        self.tool_approval = tool_approval
 
 
 class GraphConfig:

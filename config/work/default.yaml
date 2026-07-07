@@ -1,3 +1,3 @@
-auto_mode: "manual"
+tool_approval: "manual"
 working_directory: "."
 command_timeout: 30
