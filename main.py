@@ -41,8 +41,8 @@ def _build_configs(
 ) -> tuple[LoggerConfig, LLMConfig, WorkConfig, GraphConfig, ToolConfig]:
     log_config = LoggerConfig(log_dir=cfg.log.log_dir, log_level=cfg.log.log_level)
     llm_config = LLMConfig(
-        model_name=cfg.llm.model_name,
-        base_url=cfg.llm.base_url,
+        model=cfg.llm.model,
+        api_base=cfg.llm.get("api_base"),
         api_key=cfg.llm.api_key,
         max_tokens=cfg.llm.max_tokens,
         streaming=cfg.llm.streaming,

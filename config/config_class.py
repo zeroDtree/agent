@@ -19,9 +19,9 @@ class LoggerConfig:
 class LLMConfig:
     def __init__(
         self,
-        model_name: str,
-        base_url: str,
+        model: str,
         api_key: str,
+        api_base: str | None = None,
         max_tokens: int = 8192,
         streaming: bool = True,
         temperature: float = 1.0,
@@ -30,8 +30,8 @@ class LLMConfig:
         thinking: Literal["enabled", "disabled"] | None = None,
         show_reasoning: bool = False,
     ):
-        self.model_name = model_name
-        self.base_url = base_url
+        self.model = model
+        self.api_base = api_base
         self.api_key = api_key
         self.max_tokens = max_tokens
         self.streaming = streaming

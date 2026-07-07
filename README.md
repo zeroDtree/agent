@@ -45,16 +45,16 @@ Set these variables before starting the agent.
 
 Required for LLM requests:
 
-| Variable          | Required | Description                                                                             |
-| ----------------- | -------- | --------------------------------------------------------------------------------------- |
-| `OPENAI_API_KEY`  | Yes      | API key used by `config/llm/deepseek.yaml`.                                             |
-| `OPENAI_API_BASE` | Yes      | Base URL used by `config/llm/deepseek.yaml` (for example DeepSeek-compatible endpoint). |
+| Variable       | Required | Description                                                              |
+| -------------- | -------- | ------------------------------------------------------------------------ |
+| `LLM_API_KEY`  | Yes      | API key used by `config/llm/default.yaml`.                               |
+| `LLM_API_BASE` | Yes      | Base URL used by `config/llm/default.yaml` (provider-compatible endpoint). |
 
 Example:
 
 ```bash
-export OPENAI_API_KEY="your_api_key"
-export OPENAI_API_BASE="https://your-provider.example/v1"
+export LLM_API_KEY="your_api_key"
+export LLM_API_BASE="https://your-provider.example/v1"
 ```
 
 ### 3.2. Prerequisites
@@ -158,7 +158,7 @@ Agent configuration is composed from files under `config/`:
 | File                         | Purpose                                                    |
 | ---------------------------- | ---------------------------------------------------------- |
 | `config/config.yaml`         | Top-level defaults composition                             |
-| `config/llm/deepseek.yaml`   | LLM endpoint, model, sampling parameters                   |
+| `config/llm/default.yaml`    | LLM model (LiteLLM), endpoint, sampling parameters         |
 | `config/work/default.yaml`   | Working directory, timeout, auto mode                      |
 | `config/tool/default.yaml`   | Safe and dangerous tools/commands                          |
 | `config/mcp/default.yaml`    | MCP endpoints for tool discovery                           |

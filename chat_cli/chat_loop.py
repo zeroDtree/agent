@@ -61,7 +61,7 @@ async def run_chat_loop(
     state = build_chat_session_state(cfg, work_config)
     renderer = CLIStreamRenderer(
         show_reasoning=llm_config.show_reasoning,
-        model_name=llm_config.model_name,
+        model_name=llm_config.model,
     )
     dispatcher = CommandDispatcher(state=state, tools=tools)
     message_builder = TurnMessageBuilder(state=state, thread_id=str(graph_config.thread_id))
@@ -73,7 +73,7 @@ async def run_chat_loop(
         stream_hint += "  ·  show_reasoning: on"
 
     _print_welcome_panel(
-        model_name=llm_config.model_name,
+        model_name=llm_config.model,
         role=state.current_role,
         temperature=llm_config.temperature,
         work_dir=state.shell_working_directory,

@@ -12,8 +12,8 @@ docker run \
 	--name agent \
 	-e HOME=/home/ubuntu \
 	-e UV_PROJECT=/tmp/agent \
-	-e OPENAI_API_KEY="$OPENAI_API_KEY" \
-	-e OPENAI_API_BASE="$OPENAI_API_BASE" \
+	-e LLM_API_KEY="$LLM_API_KEY" \
+	-e LLM_API_BASE="$LLM_API_BASE" \
 	agent:1.0 \
 	bash -c 'set -euo pipefail
 mkdir -p /tmp/agent

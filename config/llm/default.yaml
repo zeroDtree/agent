@@ -1,6 +1,6 @@
-model_name: "deepseek-v4-pro"
-base_url: ${oc.env:OPENAI_API_BASE}
-api_key: ${oc.env:OPENAI_API_KEY}
+model: "deepseek/deepseek-v4-pro"
+api_base: ${oc.env:LLM_API_BASE}
+api_key: ${oc.env:LLM_API_KEY}
 max_tokens: 384000 # max tokens number for model to output
 streaming: true
 temperature: 1.0

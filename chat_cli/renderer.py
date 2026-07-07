@@ -100,9 +100,12 @@ class CLIStreamRenderer:
         self.streaming_appended_history_keys: set = set()
         self.nonstreaming_emitted_message_keys: set = set()
         self.streaming_emitted_tool_call_keys: set = set()
-        self.streamed_ai = False
+        self._reset_ai_segment()
+
+    def _reset_ai_segment(self) -> None:
         self.stream_reasoning_started = False
         self.stream_answer_started = False
+        self.streamed_ai = False
 
     def _write(self, s: str = "", *, end: str = "\n") -> None:
         print(s, end=end, file=self._out, flush=True)
@@ -132,6 +135,7 @@ class CLIStreamRenderer:
             elif isinstance(msg, ToolMessage):
                 tid = getattr(msg, "id", None) or hash(str(msg.content))
                 if tid not in self.streaming_printed_tool_keys:
+                    self._reset_ai_segment()
                     self._print_tool_message(msg)
                     self.streaming_printed_tool_keys.add(tid)
             return

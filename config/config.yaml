@@ -3,7 +3,7 @@ defaults:
   - log: default
   - chat: default
   - work: default
-  - llm: deepseek
+  - llm: default
   - ekb: default
   - char: default
   - tool: default
