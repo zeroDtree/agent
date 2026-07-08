@@ -1,7 +1,11 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
 [project]
-name = "agent"
+name = "zdt-agent"
 version = "0.1.0"
-description = "Add your description here"
+description = "LangGraph-based agent runtime with MCP integration and prompt manager"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
@@ -23,20 +27,27 @@ dependencies = [
 	"hydra-core",
 	"omegaconf",
 	"gnureadline>=8.3.3",
-	"ruff",
-	"ty",
 	"neo4j",
 	"jsonschema>=4.23.0",
-	"pylint>=4.0.5",
 	"tabulate>=0.10.0",
 	"litellm>=1.91.0",
 ]
 
+[project.scripts]
+zdt_agent = "zdt_agent.main:main"
+zdt_agent_kb = "zdt_agent.manage_kb:main"
+
+[project.optional-dependencies]
+ekb = ["sentence-transformers"]
+
 [dependency-groups]
 lint = ["black", "pylint", "autoflake"]
 ekb = ["sentence-transformers"]
-dev = ["pytest", { include-group = "lint" }, { include-group = "ekb" }]
+dev = ["pytest", "ruff", "ty", { include-group = "lint" }, { include-group = "ekb" }]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/zdt_agent"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]
+pythonpath = ["src"]
 testpaths = ["test"]

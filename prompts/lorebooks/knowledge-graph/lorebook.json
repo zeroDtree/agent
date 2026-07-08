@@ -1,0 +1,69 @@
+{
+  "id": "knowledge-graph",
+  "name": "Knowledge Graph",
+  "enabled": true,
+  "description": "LoreBook generated from /Users/zengls/repo/agent/prompts/lorebooks/knowledge-graph",
+  "source_scope": [
+    "global",
+    "character",
+    "persona",
+    "chat"
+  ],
+  "merge_policy": {
+    "mode": "global_sorted_merge",
+    "priority": [
+      "character",
+      "persona",
+      "chat",
+      "global"
+    ]
+  },
+  "budget": {
+    "max_tokens": 2000,
+    "overflow_policy": "drop_low_priority"
+  },
+  "runtime": {
+    "max_recursion_steps": 3,
+    "random_seed_strategy": "session_stable",
+    "log_level": "normal"
+  },
+  "entries": [
+    {
+      "id": "knowledge-graph-memory",
+      "path": "entries/knowledge-graph-memory.md",
+      "enabled": true,
+      "content": "<knowledge_graph_memory>\n\nYou have access to a Knowledge Graph MCP server for long-term memory.\nUse it to maintain two memory domains across conversations:\n- User profile memory: identity, stable preferences, working habits, long-term goals, constraints.\n- User world memory: people, teams, organizations, projects, tools, events, and relationships.\n\nMemory objective:\n- Improve continuity and personalization.\n- Reuse known facts instead of repeatedly asking for the same context.\n- Keep memory high-signal, current, and safe.\n\nWrite only stable and high-value facts:\n- Store facts that are likely useful in future turns.\n- Prefer confirmed statements from the user.\n- Ignore transient emotions, guesses, and one-off noise.\n- Do not store sensitive secrets (passwords, API keys, tokens, private IDs, bank/credential data).\n\nRetrieval before response:\n- For non-trivial requests, retrieve relevant entities first.\n- Use the most specific entry point available:\n  - `search_entities` to locate candidate entities.\n  - `get_memories_for_subject` to fetch known triples.\n  - `get_neighbors` to expand nearby context when relationships matter.\n  - `query_graph` for constrained read-only Cypher when needed.\n- Ground your response in retrieved facts when relevant.\n\nPersistence after response:\n- After answering, persist newly confirmed durable facts with `add_memory(subject, relation, obj)`.\n- Keep triples atomic and normalized.\n- Use relation names in uppercase snake case matching `^[A-Za-z_][A-Za-z0-9_]{0,63}$` (for example: `LIKES`, `WORKS_ON`, `USES_TOOL`, `HAS_CONSTRAINT`).\n\nConflict and correction policy:\n- If new information conflicts with old memory, prefer newer and more specific facts.\n- When a relation should be replaced, remove stale triples with `delete_memory(..., dry_run=true)` first, then execute deletion only if match is correct, and write the updated triple.\n- Do not delete broadly; perform minimal, targeted corrections.\n\nOperational loop (Retrieve -> Answer -> Persist):\n1) Retrieve relevant memory for the current topic.\n2) Answer the user using retrieved context plus current turn information.\n3) Persist only newly confirmed durable facts.\n\n</knowledge_graph_memory>",
+      "resolved": {
+        "triggers": {
+          "keywords": [],
+          "regex": [
+            ".*"
+          ],
+          "case_sensitive": false,
+          "whole_word": false
+        },
+        "filters": {},
+        "injection": {
+          "position_type": "after_character",
+          "order": 110,
+          "message_type": null,
+          "depth": null
+        },
+        "advanced": {
+          "inclusion_group": null,
+          "group_scoring": false,
+          "probability": 1.0,
+          "recursive": false,
+          "max_recursion_depth": 0,
+          "sticky_turns": 0,
+          "cooldown_turns": 0,
+          "delay_turns": 0
+        },
+        "budget": {
+          "max_tokens": 800,
+          "truncate": "tail"
+        }
+      }
+    }
+  ]
+}

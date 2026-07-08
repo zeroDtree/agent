@@ -25,7 +25,7 @@ fi
 
 echo "Args: $*"
 if [ -n "${UV_PROJECT:-}" ]; then
-    uv run --project "$UV_PROJECT" python "$PROJECT_DIR/main.py" "$@"
+    uv run --project "$UV_PROJECT" zdt_agent "$@"
 else
-    uv run main.py "$@"
+    uv run zdt_agent "$@"
 fi

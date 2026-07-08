@@ -4,11 +4,11 @@ from pathlib import Path
 
 import pytest
 
-from config.config_class import GraphConfig, WorkConfig
-from config.sandbox import NetworkPolicy, SandboxProfile, WorkMode, resolve_path_layout
-from sandbox.sbpl import build_sbpl
-from tools.capability import MODE_CAPS, ToolCapability, capability_allowed_in_mode
-from tools.path_policy import PathPolicyError, resolve_plan_path, resolve_workspace_path
+from zdt_agent.config.config_class import GraphConfig, WorkConfig
+from zdt_agent.config.sandbox import NetworkPolicy, SandboxProfile, WorkMode, resolve_path_layout
+from zdt_agent.sandbox.sbpl import build_sbpl
+from zdt_agent.tools.capability import MODE_CAPS, ToolCapability, capability_allowed_in_mode
+from zdt_agent.tools.path_policy import PathPolicyError, resolve_plan_path, resolve_workspace_path
 
 
 def test_mode_caps_matrix():
@@ -66,7 +66,7 @@ def test_build_sbpl_rw_allows_writes_when_network_enabled():
 
 
 def test_filter_tools_for_mode_filters_write_tools():
-    from tools import build_tool_catalog, filter_tools_for_mode
+    from zdt_agent.tools import build_tool_catalog, filter_tools_for_mode
 
     work_config = WorkConfig(work_mode=WorkMode.RO)
     graph_config = GraphConfig()
@@ -90,7 +90,7 @@ def test_resolve_path_layout_includes_plan_dir(tmp_path: Path):
 
 
 def test_apply_plan_patch_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from tools.plan import get_plan_tools
+    from zdt_agent.tools.plan import get_plan_tools
 
     workspace = tmp_path / "project"
     workspace.mkdir()
@@ -111,7 +111,7 @@ def test_apply_plan_patch_success(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 
 def test_apply_plan_patch_old_text_not_found(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from tools.plan import get_plan_tools
+    from zdt_agent.tools.plan import get_plan_tools
 
     workspace = tmp_path / "project"
     workspace.mkdir()
@@ -129,7 +129,7 @@ def test_apply_plan_patch_old_text_not_found(tmp_path: Path, monkeypatch: pytest
 
 
 def test_plan_tools_follow_thread_id_change(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    from tools.plan import get_plan_tools
+    from zdt_agent.tools.plan import get_plan_tools
 
     workspace = tmp_path / "project"
     workspace.mkdir()

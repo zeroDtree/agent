@@ -1,12 +1,12 @@
 ## Embedding Knowledge Base (EKB)
 
-Indexes local documents into a vector database for semantic retrieval by the agent. Managed via `manage_kb.py`, independently of the agent process.
+Indexes local documents into a vector database for semantic retrieval by the agent. Managed via `zdt_agent_kb`, independently of the agent process.
 
 ### Usage
 
 ```bash
-uv run python manage_kb.py <command> [options]
-uv run python manage_kb.py <command> --help
+uv run zdt_agent_kb <command> [options]
+uv run zdt_agent_kb <command> --help
 ```
 
 | Command  | Description                          |
@@ -21,23 +21,23 @@ uv run python manage_kb.py <command> --help
 
 ```bash
 # Index current directory into a new knowledge base
-uv run python manage_kb.py update -n my_kb -s .
+uv run zdt_agent_kb update -n my_kb -s .
 
 # Index a specific directory
-uv run python manage_kb.py update -n blog -s data/blog_content
+uv run zdt_agent_kb update -n blog -s data/blog_content
 
 # Re-index an existing knowledge base
-uv run python manage_kb.py update -n blog
+uv run zdt_agent_kb update -n blog
 
 # Search
-uv run python manage_kb.py search "machine learning concepts" -n blog
+uv run zdt_agent_kb search "machine learning concepts" -n blog
 
 # View statistics
-uv run python manage_kb.py status -n blog
+uv run zdt_agent_kb status -n blog
 
 # List all knowledge bases
-uv run python manage_kb.py list
+uv run zdt_agent_kb list
 
 # Add text directly
-uv run python manage_kb.py add blog "New content" -t "Title"
+uv run zdt_agent_kb add blog "New content" -t "Title"
 ```

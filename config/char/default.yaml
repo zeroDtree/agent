@@ -1,5 +1,5 @@
 active: "main"
-prompt_dir: "prompts/chars"
+prompt_dir: "chars"
 lorebook_ids:
   - "coding-default"
 persona_prompt_path: null
