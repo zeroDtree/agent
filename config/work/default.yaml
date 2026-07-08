@@ -1,3 +1,12 @@
-tool_approval: "manual"
+work_mode: ro
+tool_approval: manual
 working_directory: "."
 command_timeout: 30
+network:
+  enabled: false
+  allowlist: []
+sandbox:
+  plan_directory: .agent/plans
+  deny_read_paths:
+    - .env
+    - "**/.env"

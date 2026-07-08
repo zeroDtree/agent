@@ -3,11 +3,17 @@ import logging
 
 from langchain_core.messages import ToolMessage
 
+from config.config_class import WorkConfig
+from graphs.routing import _policy_violation
 from graphs.state import State
 from graphs.utils import extract_text_from_content_blocks
 
 
-def get_custom_tool_node(tools=None, logger: logging.Logger | None = None):
+def get_custom_tool_node(
+    tools=None,
+    work_config: WorkConfig | None = None,
+    logger: logging.Logger | None = None,
+):
     """
     Create a custom tool node that executes tools and converts MCP tool response
     content from list format to string format for LLM compatibility.
@@ -25,6 +31,15 @@ def get_custom_tool_node(tools=None, logger: logging.Logger | None = None):
             tool_name = tool_call.get("name", "")
             tool_args = tool_call.get("args", {})
             tool_call_id = tool_call.get("id", "")
+
+            if work_config is not None:
+                violation = _policy_violation(tool_call, work_config, tool_dict)
+                if violation is not None:
+                    return ToolMessage(
+                        content=f"Tool execution blocked: {violation}",
+                        tool_call_id=tool_call_id,
+                        name=tool_name,
+                    )
 
             if tool_name in tool_dict:
                 tool = tool_dict[tool_name]

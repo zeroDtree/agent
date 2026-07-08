@@ -4,8 +4,8 @@ from typing import Any, cast
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import START, StateGraph
 
-# Re-export config types so existing callers (main.py) keep working
-from config.config_class import GraphConfig, LLMConfig, LoggerConfig, ToolApprovalPolicy, ToolConfig, WorkConfig
+from config.config_class import GraphConfig, LLMConfig, LoggerConfig, ToolApprovalPolicy, WorkConfig
+from config.sandbox import WorkMode
 from graphs.nodes import get_auto_reject_node, get_chatbot_node, get_custom_tool_node, get_human_confirm_node
 from graphs.routing import make_chatbot_router
 from graphs.state import State
@@ -15,10 +15,10 @@ __all__ = [
     "Graph",
     "State",
     "ToolApprovalPolicy",
+    "WorkMode",
     "GraphConfig",
     "LLMConfig",
     "LoggerConfig",
-    "ToolConfig",
     "WorkConfig",
 ]
 
@@ -31,7 +31,6 @@ class Graph:
         logger: logging.Logger | None = None,
         llm_config: LLMConfig | None = None,
         work_config: WorkConfig | None = None,
-        tool_config: ToolConfig | None = None,
     ):
         assert logger_config is not None or logger is not None, "Either logger_config or logger must be provided"
         if logger_config is not None:
@@ -45,21 +44,25 @@ class Graph:
         self.config = config
         self.llm_config = llm_config
         self.work_config = work_config
-        self.tool_config = tool_config
 
     def create_graph(self, tools=None, checkpointer=None, need_memory=False):
         assert self.llm_config is not None
         assert self.work_config is not None
-        assert self.tool_config is not None
 
         if checkpointer is None:
             checkpointer = InMemorySaver() if need_memory else None
 
-        tools = tools or []
-        tool_node = get_custom_tool_node(tools=tools, logger=self.logger)
+        tool_catalog = tools or []
+
+        tool_node = get_custom_tool_node(
+            tools=tool_catalog,
+            work_config=self.work_config,
+            logger=self.logger,
+        )
         chatbot_node = get_chatbot_node(
             config=self.llm_config,
-            tools=tools,
+            work_config=self.work_config,
+            tool_catalog=tool_catalog,
             max_history=self.config.n_max_history,
         )
         human_confirm_node = get_human_confirm_node(
@@ -69,7 +72,7 @@ class Graph:
         auto_reject_node = get_auto_reject_node(next_node="chatbot")
         router = make_chatbot_router(
             work_config=self.work_config,
-            tool_config=self.tool_config,
+            tools=tool_catalog,
             logger=self.logger,
         )
 

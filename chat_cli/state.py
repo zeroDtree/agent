@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from config.config_class import WorkConfig
+
 
 @dataclass
 class ChatSessionState:
@@ -18,3 +20,4 @@ class ChatSessionState:
     persona_prompt_path: str | None = None
     preset_segments_enabled: dict[str, bool] | None = None
     preset_segment_order: list[str] | None = None
+    work_config: WorkConfig | None = None

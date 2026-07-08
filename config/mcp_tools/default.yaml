@@ -1,0 +1,5 @@
+tool_defaults:
+  capability: ro
+  needs_network: true
+
+tools: {}

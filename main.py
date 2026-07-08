@@ -10,9 +10,10 @@ from omegaconf import DictConfig
 from chat_cli import run_chat_loop
 from chat_cli.logging_setup import quiet_http_client_loggers
 from chat_cli.text_output import print_config_block, print_mcp_servers_status, redact_sensitive_mapping
-from config.config_class import GraphConfig, LLMConfig, ToolApprovalPolicy, ToolConfig, WorkConfig
+from config.config_class import GraphConfig, LLMConfig, McpToolConfig, ToolApprovalPolicy, WorkConfig
+from config.sandbox import NetworkPolicy, SandboxSettings, WorkMode
 from graphs.graph import Graph
-from tools import get_all_tools
+from tools import build_tool_catalog, tag_mcp_tools
 from utils.logger import LoggerConfig, get_and_create_new_log_dir, get_logger
 
 quiet_http_client_loggers()
@@ -38,7 +39,7 @@ def _coerce_bool(value: object, *, default: bool = False) -> bool:
 
 def _build_configs(
     cfg: DictConfig,
-) -> tuple[LoggerConfig, LLMConfig, WorkConfig, GraphConfig, ToolConfig]:
+) -> tuple[LoggerConfig, LLMConfig, WorkConfig, GraphConfig, McpToolConfig]:
     log_config = LoggerConfig(log_dir=cfg.log.log_dir, log_level=cfg.log.log_level)
     llm_config = LLMConfig(
         model=cfg.llm.model,
@@ -52,10 +53,22 @@ def _build_configs(
         thinking=cfg.llm.get("thinking"),
         show_reasoning=_coerce_bool(omegaconf.OmegaConf.select(cfg.llm, "show_reasoning", default=False)),
     )
+
+    network_cfg = cfg.work.get("network", {})
+    sandbox_cfg = cfg.work.get("sandbox", {})
     work_config = WorkConfig(
         working_directory=cfg.work.working_directory,
         command_timeout=cfg.work.command_timeout,
         tool_approval=ToolApprovalPolicy(cfg.work.tool_approval),
+        work_mode=WorkMode(cfg.work.work_mode),
+        network=NetworkPolicy(
+            enabled=_coerce_bool(network_cfg.get("enabled", False)),
+            allowlist=tuple(network_cfg.get("allowlist", [])),
+        ),
+        sandbox=SandboxSettings(
+            plan_directory=str(sandbox_cfg.get("plan_directory", ".agent/plans")),
+            deny_read_paths=tuple(sandbox_cfg.get("deny_read_paths", [".env"])),
+        ),
     )
     graph_config = GraphConfig(
         n_max_history=cfg.system.n_max_history,
@@ -63,13 +76,25 @@ def _build_configs(
         recursion_limit=cfg.system.recursion_limit,
         stream_mode=cfg.system.stream_mode,
     )
-    tool_config = ToolConfig(
-        safe_tools=cfg.tool.get("safe_tools", []),
-        dangerous_tools=cfg.tool.get("dangerous_tools", []),
-        safe_shell_commands=cfg.tool.get("safe_shell_commands", []),
-        dangerous_shell_commands=cfg.tool.get("dangerous_shell_commands", []),
+    mcp_defaults = cfg.mcp_tools.get("tool_defaults", {})
+    mcp_tools_cfg = dict(cfg.mcp_tools.get("tools", {}))
+    tool_capabilities = {
+        name: str(value.get("capability", mcp_defaults.get("capability", "ro")))
+        for name, value in mcp_tools_cfg.items()
+        if isinstance(value, dict)
+    }
+    tool_needs_network = {
+        name: value.get("needs_network")
+        for name, value in mcp_tools_cfg.items()
+        if isinstance(value, dict) and "needs_network" in value
+    }
+    mcp_tool_config = McpToolConfig(
+        tool_capabilities=tool_capabilities,
+        tool_needs_network=tool_needs_network,
+        default_capability=str(mcp_defaults.get("capability", "ro")),
+        default_needs_network=_coerce_bool(mcp_defaults.get("needs_network", True)),
     )
-    return log_config, llm_config, work_config, graph_config, tool_config
+    return log_config, llm_config, work_config, graph_config, mcp_tool_config
 
 
 # ---------------------------------------------------------------------------
@@ -109,21 +134,21 @@ async def async_main(cfg: DictConfig):
         safe = resolved
     print_config_block("Hydra config", safe)
 
-    log_config, llm_config, work_config, graph_config, tool_config = _build_configs(cfg)
+    log_config, llm_config, work_config, graph_config, mcp_tool_config = _build_configs(cfg)
     log_dir = get_and_create_new_log_dir(root=log_config.log_dir, prefix="", suffix="", strftime_format="%Y%m%d")
     logger = get_logger(name=__name__, log_dir=log_dir)
 
     try:
         mcp_tools, mcp_rows = await _load_mcp_tools_with_status(cfg.mcp)
+        mcp_tools = tag_mcp_tools(mcp_tools, mcp_tool_config)
         print_mcp_servers_status(mcp_rows)
-        tools = get_all_tools(work_config=work_config) + mcp_tools
+        tool_catalog = build_tool_catalog(work_config, graph_config, mcp_tools)
         graph = Graph(
             logger=logger,
             llm_config=llm_config,
             work_config=work_config,
             config=graph_config,
-            tool_config=tool_config,
-        ).create_graph(need_memory=True, tools=tools)
+        ).create_graph(need_memory=True, tools=tool_catalog)
 
         await run_chat_loop(
             graph=graph,
@@ -131,7 +156,7 @@ async def async_main(cfg: DictConfig):
             llm_config=llm_config,
             graph_config=graph_config,
             logger=logger,
-            tools=tools,
+            tool_catalog=tool_catalog,
             work_config=work_config,
         )
 

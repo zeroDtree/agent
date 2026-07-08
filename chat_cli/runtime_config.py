@@ -107,4 +107,5 @@ def build_chat_session_state(
         persona_prompt_path=persona_prompt_path,
         preset_segments_enabled=preset_segments_enabled,
         preset_segment_order=preset_segment_order,
+        work_config=work_config,
     )

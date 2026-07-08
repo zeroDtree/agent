@@ -1,12 +1,14 @@
 from enum import Enum
 from typing import Literal
 
+from config.sandbox import NetworkPolicy, SandboxSettings, WorkMode
+
 
 class ToolApprovalPolicy(Enum):
     MANUAL = "manual"  # all tools require confirmation
     UNIVERSAL_REJECT = "universal_reject"  # auto-reject all tools
-    BLACKLIST_REJECT = "blacklist_reject"  # other tools require confirmation
-    WHITELIST_ACCEPT = "whitelist_accept"  # auto-approve safe tools, confirm dangerous tools
+    BLACKLIST_REJECT = "blacklist_reject"  # dangerous capabilities auto-rejected, others confirmed
+    WHITELIST_ACCEPT = "whitelist_accept"  # safe capabilities auto-approved, others confirmed
     UNIVERSAL_ACCEPT = "universal_accept"  # auto-approve all tools
 
 
@@ -48,10 +50,16 @@ class WorkConfig:
         working_directory: str = ".",
         command_timeout: int = 30,
         tool_approval: ToolApprovalPolicy = ToolApprovalPolicy.MANUAL,
+        work_mode: WorkMode = WorkMode.RO,
+        network: NetworkPolicy | None = None,
+        sandbox: SandboxSettings | None = None,
     ):
         self.working_directory = working_directory
         self.command_timeout = command_timeout
         self.tool_approval = tool_approval
+        self.work_mode = work_mode
+        self.network = network or NetworkPolicy()
+        self.sandbox = sandbox or SandboxSettings()
 
 
 class GraphConfig:
@@ -68,15 +76,15 @@ class GraphConfig:
         self.stream_mode = stream_mode
 
 
-class ToolConfig:
+class McpToolConfig:
     def __init__(
         self,
-        safe_tools: list[str],
-        dangerous_tools: list[str],
-        safe_shell_commands: list[str],
-        dangerous_shell_commands: list[str],
+        tool_capabilities: dict[str, str] | None = None,
+        tool_needs_network: dict[str, bool] | None = None,
+        default_capability: str = "ro",
+        default_needs_network: bool = True,
     ):
-        self.safe_tools = safe_tools
-        self.dangerous_tools = dangerous_tools
-        self.safe_shell_commands = safe_shell_commands
-        self.dangerous_shell_commands = dangerous_shell_commands
+        self.tool_capabilities = tool_capabilities or {}
+        self.tool_needs_network = tool_needs_network or {}
+        self.default_capability = default_capability
+        self.default_needs_network = default_needs_network

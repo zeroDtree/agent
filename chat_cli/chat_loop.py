@@ -26,8 +26,11 @@ def _print_welcome_panel(
     role: str,
     temperature: float,
     work_dir: str,
+    work_mode: str,
+    network_enabled: bool,
     stream_hint: str,
 ) -> None:
+    network_state = "on" if network_enabled else "off"
     lines = [
         "MyAgent CLI",
         "",
@@ -35,8 +38,11 @@ def _print_welcome_panel(
         f"Role         {role}",
         f"Temperature  {temperature}",
         f"Work dir     {work_dir}",
+        f"Work mode    {work_mode}",
+        f"Network      {network_state}",
         "",
         "Type exit or quit to leave. One line per Enter; paste multi-line as one message is OK.",
+        "Use !mode and !network to change execution policy.",
         stream_hint,
     ]
     inner = max(len(s) for s in lines)
@@ -55,7 +61,7 @@ async def run_chat_loop(
     llm_config: LLMConfig,
     graph_config: GraphConfig,
     logger,
-    tools: list,
+    tool_catalog: list,
     work_config: WorkConfig,
 ):
     state = build_chat_session_state(cfg, work_config)
@@ -63,7 +69,11 @@ async def run_chat_loop(
         show_reasoning=llm_config.show_reasoning,
         model_name=llm_config.model,
     )
-    dispatcher = CommandDispatcher(state=state, tools=tools)
+    dispatcher = CommandDispatcher(
+        state=state,
+        tool_catalog=tool_catalog,
+        work_config=work_config,
+    )
     message_builder = TurnMessageBuilder(state=state, thread_id=str(graph_config.thread_id))
 
     stream_hint = (
@@ -77,6 +87,8 @@ async def run_chat_loop(
         role=state.current_role,
         temperature=llm_config.temperature,
         work_dir=state.shell_working_directory,
+        work_mode=work_config.work_mode.value,
+        network_enabled=work_config.network.enabled,
         stream_hint=stream_hint,
     )
 

@@ -19,7 +19,7 @@ A LangGraph-based agent runtime with MCP integration, shell tooling, configurabl
     - [4.1. Optional Environment Variables](#41-optional-environment-variables)
     - [4.2. Hydra Config Map](#42-hydra-config-map)
     - [4.3. MCP Runtime Model](#43-mcp-runtime-model)
-  - [5. Tool Approval Policy Reference](#5-tool-approval-policy-reference)
+  - [5. Work Mode and Policy Reference](#5-work-mode-and-policy-reference)
   - [6. Tooling Model](#6-tooling-model)
     - [6.1. Local Built-In Tools](#61-local-built-in-tools)
     - [6.2. MCP-Discovered Tools](#62-mcp-discovered-tools)
@@ -119,7 +119,11 @@ After `bash shell_scripts/start.sh` (or `bash shell_scripts/start.docker.sh` in 
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `exit` / `quit`            | Exit the CLI.                                                                                                                                                          |
 | `!help`                    | Print this command summary.                                                                                                                                            |
-| `!tool list`               | List available tools (local plus MCP).                                                                                                                                 |
+| `!mode`                    | Show current work mode (`ro`, `sw`, `aw`, `pl`).                                                                                                                       |
+| `!mode <ro\|sw\|aw\|pl>`   | Switch work mode (AW prompts for confirmation).                                                                                                                          |
+| `!network`                 | Show whether outbound network is enabled.                                                                                                                              |
+| `!network on\|off`         | Enable or disable outbound network (on prompts for confirmation).                                                                                                        |
+| `!tool list`               | List tools available in the current work mode.                                                                                                                         |
 | `!tool <name> [json_args]` | Invoke a tool with JSON arguments (defaults to `{}` if omitted).                                                                                                       |
 | `!char list`               | List character roles from the configured role prompt directory (`char.prompt_dir`, default `prompts/chars`).                                                           |
 | `!char show`               | Show the active role and its prompt file path.                                                                                                                         |
@@ -159,8 +163,8 @@ Agent configuration is composed from files under `config/`:
 | ---------------------------- | ---------------------------------------------------------- |
 | `config/config.yaml`         | Top-level defaults composition                             |
 | `config/llm/default.yaml`    | LLM model (LiteLLM), endpoint, sampling parameters         |
-| `config/work/default.yaml`   | Working directory, timeout, tool approval policy             |
-| `config/tool/default.yaml`   | Safe and dangerous tools/commands                          |
+| `config/work/default.yaml`   | Work mode, network switch, sandbox paths, timeout, tool approval |
+| `config/mcp_tools/default.yaml` | MCP tool capability defaults                                   |
 | `config/mcp/default.yaml`    | MCP endpoints for tool discovery                           |
 | `config/system/default.yaml` | History length, recursion limit, thread                    |
 | `config/log/default.yaml`    | Log directory and log level                                |
@@ -183,31 +187,70 @@ Default configured MCP servers:
 | `code_lint`       | `streamable-http`                    | `0.0.0.0:8001` | `http://127.0.0.1:8001/mcp`                |
 | `knowledge_graph` | `streamable-http`                    | `0.0.0.0:8002` | `http://127.0.0.1:8002/mcp`                |
 
-## 5. Tool Approval Policy Reference
+## 5. Work Mode and Policy Reference
+
+Three independent axes control execution:
+
+| Axis | Config field | Purpose |
+| ---- | ------------ | ------- |
+| **WorkMode** | `work.work_mode` | Filesystem capability (`ro`, `sw`, `aw`, `pl`) |
+| **NetworkPolicy** | `work.network.enabled` | Outbound network on/off (default off) |
+| **ToolApprovalPolicy** | `work.tool_approval` | Per-call confirmation behavior |
+
+### 5.1. Work Modes
+
+| Mode | Shell | Tools | Typical use |
+| ---- | ----- | ----- | ----------- |
+| **RO** | read-only sandbox | read tools | Explore code |
+| **SW** | read-only sandbox | read + write tools | Safe editing via structured tools |
+| **AW** | read-write sandbox | read + write tools | Full shell writes |
+| **PL** | read-only sandbox | read + plan write tools | Write plans under `.agent/plans/` |
+
+CLI: `!mode ro|sw|aw|pl`
+
+### 5.2. Network Switch
+
+`work.network.enabled` is independent from work mode. When `false`, shell and MCP tools tagged `needs_network` are blocked.
+
+CLI: `!network on|off`
+
+### 5.3. Tool Approval Policy
 
 Configure approval behavior with `work.tool_approval`:
 
-| Mode                 | Config             | When to use it                                                |
-| -------------------- | ------------------ | ------------------------------------------------------------- |
-| **Manual**           | `manual`           | You want confirmation for every tool call                     |
-| **Blacklist Reject** | `blacklist_reject` | You want dangerous calls rejected, others confirmed manually  |
-| **Universal Reject** | `universal_reject` | You want a strict no-tool execution mode                      |
-| **Whitelist Accept** | `whitelist_accept` | You want trusted calls auto-approved, others confirmed        |
-| **Universal Accept** | `universal_accept` | You want fully automatic tool execution without confirmations |
+| Policy | Config | When to use it |
+| ------ | ------ | -------------- |
+| **Manual** | `manual` | Confirm every tool call |
+| **Blacklist Reject** | `blacklist_reject` | Auto-reject write capabilities, confirm others |
+| **Universal Reject** | `universal_reject` | Strict no-tool execution |
+| **Whitelist Accept** | `whitelist_accept` | Auto-approve read capabilities, confirm writes |
+| **Universal Accept** | `universal_accept` | Fully automatic execution |
 
-Safe and dangerous lists are defined in `config/tool/default.yaml`.
+MCP tool capabilities are configured in `config/mcp_tools/default.yaml`. Use `tool_defaults` for global MCP tool tags (do not use Hydra's reserved `defaults` key):
 
-## 6. Tooling Model
+```yaml
+tool_defaults:
+  capability: ro
+  needs_network: true
+
+tools:
+  some_mcp_tool:
+    capability: rw
+    needs_network: false
+```
 
 This project exposes both local Python tools and MCP-discovered remote tools.
 
 ### 6.1. Local Built-In Tools
 
-| Tool name                      | Enabled by default | Source                              | Description                               |
-| ------------------------------ | ------------------ | ----------------------------------- | ----------------------------------------- |
-| `run_shell_command_popen_tool` | Yes                | `tools/shell.py`                    | Execute shell commands and return output  |
-| `search_knowledge_base`        | Yes                | `tools/embedding_knowledge_base.py` | Search the EKB vector database            |
-| `todo_list_tool`               | No                 | `tools/todo_list.py`                | Manage todo items in conversation context |
+| Tool name | Capability | Source | Description |
+| --------- | ---------- | ------ | ----------- |
+| `list_dir`, `read_file`, `grep` | read | `tools/fs_read.py` | Workspace read primitives |
+| `write_file`, `apply_patch`, `create_directory` | write | `tools/fs_write.py` | Workspace write primitives |
+| `write_plan`, `read_plan`, `list_plans`, `append_plan`, `apply_plan_patch` | plan | `tools/plan.py` | Session plan artifacts |
+| `run_shell_readonly` | shell (ro) | `tools/shell.py` | Sandboxed read-only shell |
+| `run_shell` | shell (rw) | `tools/shell.py` | Sandboxed read-write shell (AW only) |
+| `search_knowledge_base` | read | `tools/embedding_knowledge_base.py` | Search the EKB vector database |
 
 ### 6.2. MCP-Discovered Tools
 
@@ -216,7 +259,8 @@ MCP tools are loaded dynamically from endpoints defined in `config/mcp/default.y
 ### 6.3. Add a New Local Tool
 
 1. Implement the tool under `tools/`.
-2. Register it in `tools.get_all_tools()`.
+2. Tag it with `ToolCapability` metadata.
+3. Register it in `tools._build_local_tools()`.
 
 No change in `main.py` is required for local tool registration.
 
